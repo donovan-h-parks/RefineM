@@ -1,0 +1,121 @@
+#!/srv/sw/python/2.7.4/bin/python
+
+###############################################################################
+#                                                                             #
+#    This program is free software: you can redistribute it and/or modify     #
+#    it under the terms of the GNU General Public License as published by     #
+#    the Free Software Foundation, either version 3 of the License, or        #
+#    (at your option) any later version.                                      #
+#                                                                             #
+#    This program is distributed in the hope that it will be useful,          #
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of           #
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the            #
+#    GNU General Public License for more details.                             #
+#                                                                             #
+#    You should have received a copy of the GNU General Public License        #
+#    along with this program. If not, see <http://www.gnu.org/licenses/>.     #
+#                                                                             #
+###############################################################################
+
+__author__ = "Donovan Parks"
+__copyright__ = "Copyright 2015"
+__credits__ = ["Donovan Parks"]
+__license__ = "GPL3"
+__maintainer__ = "Donovan Parks"
+__email__ = "donovan.parks@gmail.com"
+__status__ = "Development"
+
+import os
+import sys
+
+import argparse
+
+from cleanm.main import OptionsParser
+from cleanm.custom_help_formatter import CustomHelpFormatter
+
+
+def version():
+    binDir = os.path.dirname(os.path.realpath(__file__))
+    versionFile = open(os.path.join(binDir, '..', 'cleanm', 'VERSION'))
+    return versionFile.read().strip()
+
+
+def print_help():
+    print ''
+    print '                ...::: CleanM v' + version() + ' :::...'''
+    print '''\
+
+    Reduce contamination:
+     taxa_profile -> Generate a taxonomic profile of contigs within a genome
+     outliers     -> [not implemented] Identify contigs with divergent GC, coverage, or tetranucleotide signatures
+     euk_origin   -> [not implemented] Identify contigs with a coding density suggestive of a Eukaryotic origin
+
+    Improve completeness:
+     reference    -> [not implemented] Identify contigs with homology to closely related reference genome(s)
+     compatible   -> [not implemented] Identify contigs with compatible GC, coverage, and tetranucleotide signatures
+     merge        -> [not implemented] Identify partial genomes which should be merged together (requires CheckM)
+
+    Modify genome:
+     modify       -> [not implemented] Modify sequences in a genome
+
+    Genome exploration and validation:
+     unique       -> [not implemented] Ensure no sequences are assigned to multiple bins
+     bin_compare  -> [not implemented] Compare two sets of bins (e.g., from alternative binning methods)
+     bin_union    -> [not implemented] Merge multiple binning efforts into a single bin set
+
+  Use: cleanm <command> -h for command specific help.
+
+  Feature requests or bug reports can be sent to Donovan Parks (donovan.parks@gmail.com)
+    or posted on GitHub (https://github.com/dparks1134/cleanm).
+    '''
+
+if __name__ == '__main__':
+
+    # initialize the options parser
+    parser = argparse.ArgumentParser(add_help=False)
+    subparsers = parser.add_subparsers(help="--", dest='subparser_name')
+
+    # identify genes within genomes
+    taxa_profile_parser = subparsers.add_parser('taxa_profile',
+                                        formatter_class=CustomHelpFormatter,
+                                        description='Generate a taxonomic profile of contigs within a genome.')
+    taxa_profile_parser.add_argument('genome_dir', help="directory containing genomes")
+    taxa_profile_parser.add_argument('db_file', help="database of reference genomes")
+    taxa_profile_parser.add_argument('taxonomy_file', help="taxonomic assignment of each reference genomes")
+    taxa_profile_parser.add_argument('output_dir', help="output directory")
+    taxa_profile_parser.add_argument('-e', '--evalue', type=float, default=1e-3, help="e-value of valid blast hits")
+    taxa_profile_parser.add_argument('-p', '--per_identity', type=float, default=30.0, help="percent identity of valid blast hits")
+    # taxa_profile_parser.add_argument('--blastx', action="store_true", default=False, help="use blastx instead of diamond")
+    taxa_profile_parser.add_argument('-w', '--window_size', type=int, default=500, help="size of fragments to classify")
+    taxa_profile_parser.add_argument('-s', '--step_size', type=int, default=500, help="base pairs to shift between fragments")
+    taxa_profile_parser.add_argument('--genome_ext', default='fna', help="extension of genomes (other files in folder are ignored)")
+    taxa_profile_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
+
+    # get and check options
+    args = None
+    if(len(sys.argv) == 1 or sys.argv[1] == '-h' or sys.argv == '--help'):
+        print_help()
+        sys.exit(0)
+    else:
+        args = parser.parse_args()
+
+    # do what we came here to do
+    try:
+        parser = OptionsParser()
+        if(False):
+            # import pstats
+            # p = pstats.Stats('prof')
+            # p.sort_stats('cumulative').print_stats(10)
+            # p.sort_stats('time').print_stats(10)
+            import cProfile
+            cProfile.run('parser.parse_options(args)', 'prof')
+        elif False:
+            import pdb
+            pdb.run(parser.parse_options(args))
+        else:
+            parser.parse_options(args)
+    except SystemExit:
+        print "\n  Controlled exit resulting from an unrecoverable error or warning."
+    except:
+        print "\nUnexpected error:", sys.exc_info()[0]
+        raise
