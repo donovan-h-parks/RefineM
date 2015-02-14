@@ -1,4 +1,5 @@
 ###############################################################################
+###############################################################################
 #                                                                             #
 #    This program is free software: you can redistribute it and/or modify     #
 #    it under the terms of the GNU General Public License as published by     #
@@ -227,10 +228,10 @@ class TaxonomicProfile(object):
 
         # run diamond
         self.logger.info('')
+        self.logger.info('  Running diamond blastx with %d processes (be patient!)' % self.cpus)
         diamond_out = os.path.join(self.output_dir, 'diamond.results.tsv')
         diamond = Diamond(self.cpus)
-        diamond.homology_criteria(evalue, per_identity)
-        # diamond.blastx(fragment_file, db_file, diamond_out)
+        # diamond.blastx(fragment_file, db_file, evalue, per_identity, 1, diamond_out)
 
         self.logger.info('')
         self.logger.info('  Reading taxonomic assignment of each reference genome.')
