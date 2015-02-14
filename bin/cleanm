@@ -31,7 +31,7 @@ import sys
 import argparse
 
 from cleanm.main import OptionsParser
-from cleanm.custom_help_formatter import CustomHelpFormatter
+from biolib.misc.custom_help_formatter import CustomHelpFormatter
 
 
 def version():

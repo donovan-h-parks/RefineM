@@ -31,10 +31,11 @@ from collections import defaultdict, namedtuple
 
 import time
 
-from cleanm.seq_io import SeqIO
-from cleanm.seq_tk import SeqToolkit
-from cleanm.diamond import Diamond
-from cleanm.common import make_sure_path_exists, alphanumeric_sort
+from biolib.seq_io import SeqIO
+from biolib.seq_tk import SeqToolkit
+from biolib.common import make_sure_path_exists, alphanumeric_sort
+from biolib.external.diamond import Diamond
+from biolib.plots.pie_chart import PieChart
 
 from numpy import mean
 
@@ -246,11 +247,14 @@ class TaxonomicProfile(object):
         self.logger.info('  Writing taxonomic profile for each genome.')
         s = time.time()
 
-        sequence_dir = os.path.join(self.output_dir, 'seq_assignments')
-        make_sure_path_exists(sequence_dir)
+        report_dir = os.path.join(self.output_dir, 'reports')
+        make_sure_path_exists(report_dir)
         for genome_id, profile in self.profiles.iteritems():
-            seq_summary_out = os.path.join(sequence_dir, genome_id + '.sequences.tsv')
+            seq_summary_out = os.path.join(report_dir, genome_id + '.sequences.tsv')
             profile.write_seq_summary(seq_summary_out)
+
+            genome_profile_out = os.path.join(report_dir, genome_id + '.profile.tsv')
+            profile.write_genome_profile(genome_profile_out)
 
         genome_summary_out = os.path.join(self.output_dir, 'genome_summary.tsv')
         self.write_genome_summary(genome_summary_out)
@@ -264,6 +268,10 @@ class TaxonomicProfile(object):
         self.profiles['bin_9'].print_summary(1)
         print ''
         self.profiles['bin_9'].print_summary(2)
+
+        pie_chart = PieChart()
+        pie_chart.plot()
+        pie_chart.save_plot('test.png')
 
 
 class Profile(object):
@@ -440,7 +448,7 @@ class Profile(object):
                                             stats[taxa].num_basepairs)
 
     def write_genome_summary(self, fout):
-        """Summarize classification of genome.
+        """Write most abundant taxa at each rank.
 
         Parameters
         ----------
@@ -472,6 +480,75 @@ class Profile(object):
                                                           'na'))
 
         fout.write('\n')
+
+    def write_genome_profile(self, output_file):
+        """Write complete profile.
+
+        Parameters
+        ----------
+        output_file : str
+            Output file.
+        """
+
+        fout = open(output_file, 'w')
+        for rank in TaxonomicProfile.RANKS:
+            if rank != TaxonomicProfile.RANKS[0]:
+                fout.write('\t')
+
+            fout.write(rank + ': taxa')
+            fout.write('\t' + rank + ': percent of bps')
+            fout.write('\t' + rank + ': percent of sequences')
+            fout.write('\t' + rank + ': avg. evalue')
+            fout.write('\t' + rank + ': avg. perc identity')
+            fout.write('\t' + rank + ': avg. align length')
+        fout.write('\n')
+
+        # sort profiles in descending order of abundance
+        sorted_profiles = {}
+        stats_dict = {}
+        max_taxa = 0
+        for r in xrange(0, len(TaxonomicProfile.RANKS)):
+            profile, stats = self.profile_at_rank(r)
+
+            sorted_profile = sorted(profile.items(), key=operator.itemgetter(1))
+            sorted_profile.reverse()
+
+            sorted_profiles[r] = sorted_profile
+            stats_dict[r] = stats
+
+            if len(sorted_profiles) > max_taxa:
+                max_taxa = len(sorted_profiles)
+
+        # write out table
+        for i in xrange(0, max_taxa):
+            for r in xrange(0, len(TaxonomicProfile.RANKS)):
+                if r != 0:
+                    fout.write('\t')
+
+                if len(sorted_profiles[r]) > i:
+                    stats = stats_dict[r]
+                    total_seq = sum([stats[t].num_seqs for t in stats])
+
+                    taxa, percent = sorted_profiles[r][i]
+
+                    if taxa != self.unclassified:
+                        fout.write('%s\t%.2f\t%.2f\t%.1g\t%.1f\t%.1f' % (taxa,
+                                                                      percent * 100,
+                                                                      stats[taxa].num_seqs * 100.0 / total_seq,
+                                                                      stats[taxa].evalue,
+                                                                      stats[taxa].perc_identity,
+                                                                      stats[taxa].aln_length))
+                    else:
+                        fout.write('%s\t%.2f\t%.2f\t%s\t%s\t%s' % (taxa,
+                                                                  percent * 100,
+                                                                  stats[taxa].num_seqs * 100.0 / total_seq,
+                                                                  'na',
+                                                                  'na',
+                                                                  'na'))
+                else:
+                    fout.write('\t\t\t\t\t')
+
+            fout.write('\n')
 
     def write_seq_summary(self, output_file):
         """Summarize classification of each sequence.

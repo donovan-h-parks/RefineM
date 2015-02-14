@@ -20,8 +20,8 @@ import sys
 import logging
 
 from cleanm.taxonomic_profile import TaxonomicProfile
-from cleanm.time_keeper import TimeKeeper
-from cleanm.common import make_sure_path_exists
+from biolib.misc.time_keeper import TimeKeeper
+from biolib.common import make_sure_path_exists
 
 
 class OptionsParser():
