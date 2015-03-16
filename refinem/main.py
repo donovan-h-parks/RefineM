@@ -19,10 +19,10 @@ import os
 import sys
 import logging
 
-from cleanm.taxonomic_profile import TaxonomicProfile
-from cleanm.gene_profile import GeneProfile
-from cleanm.bin_comparer import BinComparer
-from cleanm.reference import Reference
+from refinem.taxonomic_profile import TaxonomicProfile
+from refinem.gene_profile import GeneProfile
+from refinem.bin_comparer import BinComparer
+from refinem.reference import Reference
 
 import biolib.genome_tk as genome_tk
 import biolib.seq_io as seq_io
@@ -73,7 +73,7 @@ class OptionsParser():
         """Call genes command"""
         self.logger.info('')
         self.logger.info('*******************************************************************************')
-        self.logger.info(' [CleanM - taxa_profile] Generating taxonomic profiles from short fragments.')
+        self.logger.info(' [RefineM - taxa_profile] Generating taxonomic profiles from short fragments.')
         self.logger.info('*******************************************************************************')
         self.logger.info('')
 
@@ -101,7 +101,7 @@ class OptionsParser():
         """Call genes command"""
         self.logger.info('')
         self.logger.info('*******************************************************************************')
-        self.logger.info(' [CleanM - gene_profile] Generating taxonomic profiles from genes.')
+        self.logger.info(' [RefineM - gene_profile] Generating taxonomic profiles from genes.')
         self.logger.info('*******************************************************************************')
         self.logger.info('')
 
@@ -208,7 +208,7 @@ class OptionsParser():
         """Unique command"""
         self.logger.info('')
         self.logger.info('*******************************************************************************')
-        self.logger.info('[CleanM - unique] Ensuring sequences are assigned to a single genome.')
+        self.logger.info('[RefineM - unique] Ensuring sequences are assigned to a single genome.')
         self.logger.info('*******************************************************************************')
         self.logger.info('')
 
@@ -247,7 +247,7 @@ class OptionsParser():
         """Bin compare command"""
         self.logger.info('')
         self.logger.info('*******************************************************************************')
-        self.logger.info('[CleanM - bin_compare] Comparing two sets of genomes.')
+        self.logger.info('[RefineM - bin_compare] Comparing two sets of genomes.')
         self.logger.info('*******************************************************************************')
         self.logger.info('')
 
@@ -269,7 +269,7 @@ class OptionsParser():
         """Reference command"""
         self.logger.info('')
         self.logger.info('*******************************************************************************')
-        self.logger.info('[CleanM - reference] Identifying scaffolds with similarity to specific genome(s).')
+        self.logger.info('[RefineM - reference] Identifying scaffolds similar to specific genome(s).')
         self.logger.info('*******************************************************************************')
         self.logger.info('')
 

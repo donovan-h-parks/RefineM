@@ -29,14 +29,14 @@ import sys
 import tempfile
 import argparse
 
-from cleanm.main import OptionsParser
+from refinem.main import OptionsParser
 from biolib.misc.custom_help_formatter import CustomHelpFormatter, ChangeTempAction
 
 
 def version():
     """Read program version from file."""
     bin_dir = os.path.dirname(os.path.realpath(__file__))
-    version_file = open(os.path.join(bin_dir, '..', 'cleanm', 'VERSION'))
+    version_file = open(os.path.join(bin_dir, '..', 'refinem', 'VERSION'))
     return version_file.read().strip()
 
 
@@ -44,7 +44,7 @@ def print_help():
     """Help menu."""
 
     print ''
-    print '                ...::: CleanM v' + version() + ' :::...'''
+    print '                ...::: RefineM v' + version() + ' :::...'''
     print '''\
 
     Reduce contamination:
@@ -66,10 +66,10 @@ def print_help():
      bin_compare  -> Compare two sets of bins/genomes (e.g., from alternative binning methods)
      bin_union    -> [not implemented] Merge multiple binning efforts into a single bin set
 
-  Use: cleanm <command> -h for command specific help.
+  Use: refinem <command> -h for command specific help.
 
   Feature requests or bug reports can be sent to Donovan Parks (donovan.parks@gmail.com)
-    or posted on GitHub (https://github.com/dparks1134/cleanm).
+    or posted on GitHub (https://github.com/dparks1134/refinem).
     '''
 
 if __name__ == '__main__':

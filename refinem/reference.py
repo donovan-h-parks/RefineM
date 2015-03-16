@@ -24,18 +24,17 @@ __maintainer__ = 'Donovan Parks'
 __email__ = 'donovan.parks@gmail.com'
 
 import os
-import sys
 import logging
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 
 import biolib.seq_io as seq_io
 from biolib.common import (make_sure_path_exists,
-                           remove_extension,
                            concatenate_files)
 from biolib.blast_parser import BlastParser
 from biolib.external.diamond import Diamond
 
 from numpy import mean
+
 
 class Reference(object):
     """Compare scaffolds to a specified set of reference genomes."""
