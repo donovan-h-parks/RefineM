@@ -4,18 +4,18 @@ import os
 
 def version():
     setupDir = os.path.dirname(os.path.realpath(__file__))
-    versionFile = open(os.path.join(setupDir, 'cleanm', 'VERSION'))
+    versionFile = open(os.path.join(setupDir, 'refinem', 'VERSION'))
     return versionFile.read().strip()
 
 setup(
-    name='cleanm',
+    name='refinem',
     version=version(),
     author='Donovan Parks',
     author_email='donovan.parks@gmail.com',
-    packages=['cleanm'],
-    scripts=['bin/cleanm'],
-    package_data={'cleanm' : ['VERSION']},
-    url='http://pypi.python.org/pypi/comparem/',
+    packages=['refinem'],
+    scripts=['bin/refinem'],
+    package_data={'refinem' : ['VERSION']},
+    url='http://pypi.python.org/pypi/refinem/',
     license='GPL3',
     description='A toolbox for improving population genomes.',
     long_description=open('README.md').read(),
