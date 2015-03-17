@@ -5,9 +5,9 @@
 RefineM is a set of tools for improving population genomes. It provides methods designed to improve the completeness of a genome along with methods for identifying and removing contamination. RefineM comprises only part of a full genome QC pipeline and should be used in conjunction with existing QC tools such as [CheckM](https://github.com/Ecogenomics/CheckM/wiki). The functionality currently planned is:
 
 <i>Improve completeness:</i>
-* identify contigs with homology to closely related reference genome(s)
+* identify contigs with similarity to specific reference genome(s)
 * identify contigs with compatible GC, coverage, and tetranucleotide signatures
-* indetify partial population genomes which should be merged together (requires[CheckM](https://github.com/Ecogenomics/CheckM/wiki))
+* indetify partial population genomes which should be merged together (requires [CheckM](https://github.com/Ecogenomics/CheckM/wiki))
 
 <i>Reducing contamination:</i>
 * taxonomically classify contigs within a genome in order to identify outliers
@@ -29,7 +29,7 @@ RefineM relies on several other software packages:
 
 ## Cite
 
-If you find this package useful, please cite this git repository (https://github.com/dparks1134/RefineM)
+If you find this package useful, please cite this git repository (https://github.com/dparks1134/refinem)
 
 ## Copyright
 
