@@ -23,9 +23,10 @@ from refinem.taxonomic_profile import TaxonomicProfile
 from refinem.gene_profile import GeneProfile
 from refinem.bin_comparer import BinComparer
 from refinem.reference import Reference
+from refinem.unbinned import Unbinned
 
-import biolib.genome_tk as genome_tk
 import biolib.seq_io as seq_io
+import biolib.genome_tk as genome_tk
 from biolib.common import (make_sure_path_exists,
                            check_dir_exists,
                            remove_extension,
@@ -115,7 +116,7 @@ class OptionsParser():
         prodigal = Prodigal(options.cpus)
         gene_dir = os.path.join(options.output_dir, 'genes')
         make_sure_path_exists(gene_dir)
-        prodigal.run(genome_files, False, None, gene_dir)
+        prodigal.run(genome_files, False, None, False, gene_dir)
 
         # modify gene ids to include genome ids in order to ensure
         # all gene identifiers are unique across the set of genomes,
@@ -279,8 +280,10 @@ class OptionsParser():
         make_sure_path_exists(scaffold_genes_dir)
         prodigal.run([options.scaffold_file], False, 11, True, scaffold_genes_dir)
         scaffold_gene_file = os.path.join(scaffold_genes_dir, remove_extension(options.scaffold_file) + '.genes.faa')
+        scaffold_nt_file = os.path.join(scaffold_genes_dir, remove_extension(options.scaffold_file) + '.genes.fna')
 
         # call genes on reference genomes
+        self.logger.info('')
         genome_files = self._genome_files(options.ref_genome_dir, options.genome_ext)
         ref_genome_genes_dir = os.path.join(options.output_dir, 'ref_genome_genes')
         make_sure_path_exists(ref_genome_genes_dir)
@@ -296,10 +299,41 @@ class OptionsParser():
         for g in binned_genomes:
             bin_id = remove_extension(g)
             for seq_id, _seq in seq_io.read_seq(g):
+                #*** This is a bit questionable, but does make RefineM compatible with FinishM
+                for contig_id in seq_id.split(':'):
+                    scaffold_id_bin_id[contig_id] = bin_id
                 scaffold_id_bin_id[seq_id] = bin_id
 
         reference = Reference(options.cpus, options.output_dir)
-        reference.run(scaffold_gene_file, ref_genome_gene_files, options.db_file, options.evalue, options.per_identity, scaffold_id_bin_id)
+        reference_out = reference.run(scaffold_gene_file, scaffold_nt_file,
+                                          ref_genome_gene_files,
+                                          options.db_file, options.coverage,
+                                          options.evalue, options.per_identity, scaffold_id_bin_id)
+
+        self.logger.info('')
+        self.logger.info('  Results written to: ' + reference_out)
+
+        self.time_keeper.print_time_stamp()
+
+    def unbinned(self, options):
+        """Unbinned Command"""
+        self.logger.info('')
+        self.logger.info('*******************************************************************************')
+        self.logger.info(' [RefineM - unbinned] Identify unbinned scaffolds.')
+        self.logger.info('*******************************************************************************')
+        self.logger.info('')
+
+        check_dir_exists(options.genome_dir)
+
+        genomes_files = self._genome_files(options.genome_dir, options.genome_ext)
+
+        unbinned = Unbinned()
+        unbinned_seqs = unbinned.run(genomes_files, options.scaffold_file, options.min_seq_len)
+
+        seq_io.write_fasta(unbinned_seqs, options.output_file)
+
+        self.logger.info('')
+        self.logger.info('  Unbinned scaffolds written to: ' + options.output_file)
 
         self.time_keeper.print_time_stamp()
 
@@ -325,6 +359,8 @@ class OptionsParser():
             self.bin_compare(options)
         elif(options.subparser_name == 'reference'):
             self.reference(options)
+        elif(options.subparser_name == 'unbinned'):
+            self.unbinned(options)
         else:
             self.logger.error('  [Error] Unknown AAI command: ' + options.subparser_name + '\n')
             sys.exit()

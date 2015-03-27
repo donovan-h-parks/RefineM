@@ -28,6 +28,7 @@ import logging
 from collections import defaultdict
 
 import biolib.seq_io as seq_io
+import biolib.seq_tk as seq_tk
 from biolib.common import (make_sure_path_exists,
                            concatenate_files)
 from biolib.blast_parser import BlastParser
@@ -71,17 +72,21 @@ class Reference(object):
 
         return hits_to_ref
 
-    def run(self, scaffold_gene_file, ref_genome_gene_files, db_file, evalue, per_identity, scaffold_id_bin_id):
+    def run(self, scaffold_gene_file, scaffold_nt_file, ref_genome_gene_files, db_file, coverage, evalue, per_identity, scaffold_id_bin_id):
         """Create taxonomic profiles for a set of genomes.
 
         Parameters
         ----------
         scaffold_gene_file : str
-            Fasta file of genes residing of scaffolds
+            Fasta file of genes residing of scaffolds in amino acid space
+        scaffold_nt_file : str
+            Fasta file of genes in nucleotide space
         ref_genome_gene_files : list of str
             Fasta files of called genes on reference genomes of interest.
         db_file : str
             Database of competing reference genes.
+        coverage : str
+            File containing coverage information for scaffolds.
         evalue : float
             E-value threshold used by blast.
         per_identity: float
@@ -122,9 +127,23 @@ class Reference(object):
 
         # get number of genes on each scaffold
         num_genes_on_scaffold = defaultdict(int)
-        for seq_id, _seq in seq_io.read_seq(scaffold_gene_file):
+        seq_gc = {}
+        seq_nt_len = {}
+        for seq_id, seq in seq_io.read_seq(scaffold_nt_file):
             scaffold_id = seq_id[0:seq_id.rfind('_')]
             num_genes_on_scaffold[scaffold_id] += 1
+            seq_gc[scaffold_id] = seq_tk.gc(seq)
+            seq_nt_len[scaffold_id] = len(seq)
+
+        # get coverage for each scaffold
+        seq_cov = {}
+        if coverage:
+            with open(coverage) as f:
+                header = [x.strip().lower() for x in f.readline().split('\t')]
+                cov_index = header.index('coverage')
+                for line in f:
+                    line_split = line.split('\t')
+                    seq_cov[line_split[0]] = float(line_split[cov_index])
 
         # get hits to each scaffold
         hits_to_scaffold = defaultdict(list)
@@ -133,23 +152,49 @@ class Reference(object):
             hits_to_scaffold[scaffold_id].append(hit)
 
         # report summary stats for each scaffold
-        fout = open(os.path.join(self.output_dir, 'references.tsv'), 'w')
-        fout.write('Scaffold Id\tBin Id\t# genes\t# hits\t% genes\tAvg. alignment length (bp)\tAvg. evalue\tAvg. bitscore\n')
+        reference_out = os.path.join(self.output_dir, 'references.tsv')
+        fout = open(reference_out, 'w')
+        fout.write('Scaffold Id\tSubject Id\tSubject Bin Ids\tAssigned Bin Id\tGC\tCoverage\tLength (bp)\t# genes\t# hits\t% genes\tAvg. alignment length (bp)\tAvg. percent identity\tAvg. evalue\tAvg. bitscore\n')
         for scaffold_id, hits in hits_to_scaffold.iteritems():
             aln_len = []
+            perc_iden = []
             evalue = []
             bitscore = []
+            subject_ids = defaultdict(int)
+            subject_bin_ids = defaultdict(int)
             for hit in hits:
                 aln_len.append(hit.aln_length)
+                perc_iden.append(hit.perc_identity)
                 evalue.append(hit.evalue)
                 bitscore.append(hit.bitscore)
-            fout.write('%s\t%s\t%d\t%d\t%.1f%%\t%d\t%.1g\t%.1f\n' % (scaffold_id,
-                                                                    scaffold_id_bin_id.get(scaffold_id, 'unbinned'),
-                                                                    num_genes_on_scaffold[scaffold_id],
-                                                                    len(hits),
-                                                                    len(hits) * 100.0 / num_genes_on_scaffold[scaffold_id],
-                                                                    mean(aln_len),
-                                                                    mean(evalue),
-                                                                    mean(bitscore)))
+
+                subject_id = hit.subject_id[0:hit.subject_id.rfind('_')]
+                subject_ids[subject_id] += 1
+                subject_bin_ids[scaffold_id_bin_id.get(subject_id, 'unbinned')] += 1
+
+            subject_id_str = []
+            for subject_id, num_hits in subject_ids.iteritems():
+                subject_id_str.append(subject_id + ':' + str(num_hits))
+            subject_id_str = ','.join(subject_id_str)
+
+            subject_bin_id_str = []
+            for bin_id, num_hits in subject_bin_ids.iteritems():
+                subject_bin_id_str.append(bin_id + ':' + str(num_hits))
+            subject_bin_id_str = ','.join(subject_bin_id_str)
+
+            fout.write('%s\t%s\t%s\t%s\t%.1f\t%.1f\t%d\t%d\t%d\t%.1f%%\t%d\t%.1f\t%.1g\t%.1f\n' % (scaffold_id,
+                                                                        subject_id_str, subject_bin_id_str,
+                                                                        scaffold_id_bin_id.get(scaffold_id, 'unbinned'),
+                                                                        seq_gc[scaffold_id] * 100, seq_cov.get(scaffold_id, -1),
+                                                                        seq_nt_len[scaffold_id],
+                                                                        num_genes_on_scaffold[scaffold_id],
+                                                                        len(hits),
+                                                                        len(hits) * 100.0 / num_genes_on_scaffold[scaffold_id],
+                                                                        mean(aln_len),
+                                                                        mean(perc_iden),
+                                                                        mean(evalue),
+                                                                        mean(bitscore)))
 
         fout.close()
+
+        return reference_out

@@ -66,6 +66,11 @@ def print_help():
      bin_compare  -> Compare two sets of bins/genomes (e.g., from alternative binning methods)
      bin_union    -> [not implemented] Merge multiple binning efforts into a single bin set
 
+    Utility functions:
+     unbinned     -> Identify unbinned scaffolds
+     coverage     -> [not implemented] Calculate coverage of sequences
+     tetra        -> [not implemented] Calculate tetranucleotide signature of sequences
+
   Use: refinem <command> -h for command specific help.
 
   Feature requests or bug reports can be sent to Donovan Parks (donovan.parks@gmail.com)
@@ -147,12 +152,23 @@ if __name__ == '__main__':
     reference_parser.add_argument('ref_genome_dir', help="directory containing reference genomes of interest")
     reference_parser.add_argument('db_file', help="database of competing reference genomes")
     reference_parser.add_argument('output_dir', help="output directory")
-    reference_parser.add_argument('--genome_dir', help="directory containing genomes binned from the specified scaffolds")
+    reference_parser.add_argument('-g', '--genome_dir', help="directory containing genomes binned from the specified scaffolds")
+    reference_parser.add_argument('--coverage', help="file containing coverage information for each scaffold")
     reference_parser.add_argument('-e', '--evalue', type=float, default=1e-3, help="e-value of valid hits")
     reference_parser.add_argument('-p', '--per_identity', type=float, default=30.0, help="percent identity of valid hits")
     reference_parser.add_argument('-x', '--genome_ext', default='fna', help="extension of genomes (other files in folder are ignored)")
     reference_parser.add_argument('--tmpdir', action=ChangeTempAction, default=tempfile.gettempdir(), help="specify alternative directory for temporary files")
     reference_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
+
+    # identify unbinned sequences
+    unbinned_parser = subparsers.add_parser('unbinned',
+                                            formatter_class=CustomHelpFormatter,
+                                            description='Identify unbinned sequences.')
+    unbinned_parser.add_argument('genome_dir', help="directory containing genomes")
+    unbinned_parser.add_argument('scaffold_file', help="scaffolds binned to generate putative genomes")
+    unbinned_parser.add_argument('output_file', help="output file containing unbinned scaffolds")
+    unbinned_parser.add_argument('-x', '--genome_ext', default='fna', help="extension of genomes (other files in folder are ignored)")
+    unbinned_parser.add_argument('-s', '--min_seq_len', type=int, default=0, help="ignore scaffolds shorter than the specified length")
 
     # get and check options
     args = None
