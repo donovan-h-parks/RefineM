@@ -72,15 +72,15 @@ class Reference(object):
 
         return hits_to_ref
 
-    def run(self, scaffold_gene_file, scaffold_nt_file, ref_genome_gene_files, db_file, coverage, evalue, per_identity, scaffold_id_bin_id):
+    def run(self, scaffold_file, scaffold_gene_file, ref_genome_gene_files, db_file, coverage, evalue, per_identity, scaffold_id_bin_id):
         """Create taxonomic profiles for a set of genomes.
 
         Parameters
         ----------
+        scaffold_file : str
+            Fasta file of scaffolds in nucleotide space
         scaffold_gene_file : str
-            Fasta file of genes residing of scaffolds in amino acid space
-        scaffold_nt_file : str
-            Fasta file of genes in nucleotide space
+            Fasta file of genes on scaffolds in amino acid space
         ref_genome_gene_files : list of str
             Fasta files of called genes on reference genomes of interest.
         db_file : str
@@ -127,11 +127,14 @@ class Reference(object):
 
         # get number of genes on each scaffold
         num_genes_on_scaffold = defaultdict(int)
-        seq_gc = {}
-        seq_nt_len = {}
-        for seq_id, seq in seq_io.read_seq(scaffold_nt_file):
+        for seq_id, seq in seq_io.read_seq(scaffold_gene_file):
             scaffold_id = seq_id[0:seq_id.rfind('_')]
             num_genes_on_scaffold[scaffold_id] += 1
+
+        # get GC and length of each scaffold
+        seq_gc = {}
+        seq_nt_len = {}
+        for scaffold_id, seq in seq_io.read_seq(scaffold_file):
             seq_gc[scaffold_id] = seq_tk.gc(seq)
             seq_nt_len[scaffold_id] = len(seq)
 

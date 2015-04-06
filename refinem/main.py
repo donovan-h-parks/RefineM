@@ -24,6 +24,7 @@ from refinem.gene_profile import GeneProfile
 from refinem.bin_comparer import BinComparer
 from refinem.reference import Reference
 from refinem.unbinned import Unbinned
+from refinem.tetranucleotide import Tetranucleotide
 
 import biolib.seq_io as seq_io
 import biolib.genome_tk as genome_tk
@@ -33,6 +34,7 @@ from biolib.common import (make_sure_path_exists,
                            check_file_exists)
 from biolib.external.prodigal import Prodigal
 from biolib.misc.time_keeper import TimeKeeper
+from biolib.external.execute import check_dependencies
 
 
 class OptionsParser():
@@ -94,7 +96,7 @@ class OptionsParser():
                                  options.step_size)
 
         self.logger.info('')
-        self.logger.info('  Taxonomic profiles written to: %s' % options.output_dir)
+        self.logger.info('  Results written to: %s' % options.output_dir)
 
         self.time_keeper.print_time_stamp()
 
@@ -157,7 +159,7 @@ class OptionsParser():
                              options.per_identity)
 
         self.logger.info('')
-        self.logger.info('  Taxonomic profiles written to: %s' % options.output_dir)
+        self.logger.info('  Results written to: %s' % options.output_dir)
 
         self.time_keeper.print_time_stamp()
 
@@ -165,7 +167,7 @@ class OptionsParser():
         """Modify command"""
         self.logger.info('')
         self.logger.info('*******************************************************************************')
-        self.logger.info(' [Clean - modify] Modifying scaffolds in genome.')
+        self.logger.info(' [RefineM - modify] Modifying scaffolds in genome.')
         self.logger.info('*******************************************************************************')
         self.logger.info('')
 
@@ -280,7 +282,6 @@ class OptionsParser():
         make_sure_path_exists(scaffold_genes_dir)
         prodigal.run([options.scaffold_file], False, 11, True, scaffold_genes_dir)
         scaffold_gene_file = os.path.join(scaffold_genes_dir, remove_extension(options.scaffold_file) + '.genes.faa')
-        scaffold_nt_file = os.path.join(scaffold_genes_dir, remove_extension(options.scaffold_file) + '.genes.fna')
 
         # call genes on reference genomes
         self.logger.info('')
@@ -305,10 +306,11 @@ class OptionsParser():
                 scaffold_id_bin_id[seq_id] = bin_id
 
         reference = Reference(options.cpus, options.output_dir)
-        reference_out = reference.run(scaffold_gene_file, scaffold_nt_file,
-                                          ref_genome_gene_files,
-                                          options.db_file, options.coverage,
-                                          options.evalue, options.per_identity, scaffold_id_bin_id)
+        reference_out = reference.run(options.scaffold_file,
+                                        scaffold_gene_file,
+                                        ref_genome_gene_files,
+                                        options.db_file, options.coverage,
+                                        options.evalue, options.per_identity, scaffold_id_bin_id)
 
         self.logger.info('')
         self.logger.info('  Results written to: ' + reference_out)
@@ -337,6 +339,47 @@ class OptionsParser():
 
         self.time_keeper.print_time_stamp()
 
+    def tetra(self, options):
+        """Tetra usage command"""
+        self.logger.info('')
+        self.logger.info('*******************************************************************************')
+        self.logger.info(' [RefineM - tetra] Calculating tetranucleotide signature of scaffolds.')
+        self.logger.info('*******************************************************************************')
+        self.logger.info('')
+
+        # determine sequences in each genome
+        genome_files = self._genome_files(options.genome_dir, options.genome_ext)
+
+        bin_id_scaffold_id = {}
+        for genome_file in genome_files:
+            bin_id = remove_extension(genome_file)
+            for seq_id, _seq in seq_io.read_seq(genome_file):
+                bin_id_scaffold_id[seq_id] = bin_id
+
+        # calculate tetranucleotide signatures
+        tetra = Tetranucleotide(options.cpus)
+        seq_signatures = tetra.run(options.scaffold_file)
+
+        # write results
+        fout = open(options.output_file, 'w')
+
+        fout.write('Scaffold id\tBin id')
+        for kmer in tetra.canonical_order():
+            fout.write('\t' + kmer)
+        fout.write('\n')
+
+        for seq_id, tetra_signature in seq_signatures.iteritems():
+            fout.write(seq_id + '\t' + bin_id_scaffold_id.get(seq_id, 'unbinned'))
+            fout.write('\t' + '\t'.join(map(str, tetra_signature)))
+            fout.write('\n')
+
+        fout.close()
+
+        self.logger.info('')
+        self.logger.info('  Tetranucleotide signatures written to: %s' % options.output_file)
+
+        self.time_keeper.print_time_stamp()
+
     def parse_options(self, options):
         """Parse user options and call the correct pipeline(s)"""
         try:
@@ -348,6 +391,8 @@ class OptionsParser():
                 logging.basicConfig(format='', level=logging.INFO)
         except:
             logging.basicConfig(format='', level=logging.INFO)
+
+        check_dependencies(('prodigal', 'diamond', 'ktImportText'))
 
         if(options.subparser_name == 'taxa_profile'):
             self.taxa_profile(options)
@@ -361,6 +406,8 @@ class OptionsParser():
             self.reference(options)
         elif(options.subparser_name == 'unbinned'):
             self.unbinned(options)
+        elif(options.subparser_name == 'tetra'):
+            self.tetra(options)
         else:
             self.logger.error('  [Error] Unknown AAI command: ' + options.subparser_name + '\n')
             sys.exit()

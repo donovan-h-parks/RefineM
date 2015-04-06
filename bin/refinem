@@ -33,6 +33,19 @@ from refinem.main import OptionsParser
 from biolib.misc.custom_help_formatter import CustomHelpFormatter, ChangeTempAction
 
 
+"""
+To Do:
+1. Should some distribution plots be added to RefineM?
+2. Perhaps a tetra plot similar to IMG?
+3. It would be useful to have a function that indicated the likelihood
+   that a scaffold might belong to a bin. This could be reported for each
+   bin. This would server two purposes: 1) identifying contigs with important
+   genes the *might* belong in a bin, 2) verifying that there are no scaffolds
+   with a critical gene that belong to a given bin (e.g., there is strong evidence
+   that this bin doesn't have an mer gene).
+"""
+
+
 def version():
     """Read program version from file."""
     bin_dir = os.path.dirname(os.path.realpath(__file__))
@@ -59,7 +72,7 @@ def print_help():
      merge        -> [not implemented] Identify partial genomes which should be merged together (requires CheckM)
 
     Modify genome:
-     modify       -> [not implemented] Modify scaffolds in a genome
+     modify       -> Modify scaffolds in a genome
 
     Genome validation and exploration:
      unique       -> Ensure sequences are assigned to a single genome
@@ -69,7 +82,7 @@ def print_help():
     Utility functions:
      unbinned     -> Identify unbinned scaffolds
      coverage     -> [not implemented] Calculate coverage of sequences
-     tetra        -> [not implemented] Calculate tetranucleotide signature of sequences
+     tetra        -> Calculate tetranucleotide signature of sequences
 
   Use: refinem <command> -h for command specific help.
 
@@ -93,7 +106,6 @@ if __name__ == '__main__':
     taxa_profile_parser.add_argument('output_dir', help="output directory")
     taxa_profile_parser.add_argument('-e', '--evalue', type=float, default=1e-3, help="e-value of valid hits")
     taxa_profile_parser.add_argument('-p', '--per_identity', type=float, default=30.0, help="percent identity of valid hits")
-    # taxa_profile_parser.add_argument('--blastx', action="store_true", default=False, help="use blastx instead of diamond")
     taxa_profile_parser.add_argument('-w', '--window_size', type=int, default=500, help="size of fragments to classify")
     taxa_profile_parser.add_argument('-s', '--step_size', type=int, default=500, help="base pairs to shift between fragments")
     taxa_profile_parser.add_argument('-x', '--genome_ext', default='fna', help="extension of genomes (other files in folder are ignored)")
@@ -169,6 +181,16 @@ if __name__ == '__main__':
     unbinned_parser.add_argument('output_file', help="output file containing unbinned scaffolds")
     unbinned_parser.add_argument('-x', '--genome_ext', default='fna', help="extension of genomes (other files in folder are ignored)")
     unbinned_parser.add_argument('-s', '--min_seq_len', type=int, default=0, help="ignore scaffolds shorter than the specified length")
+
+    # calculate tetranucleotide signatures
+    tetra_parser = subparsers.add_parser('tetra',
+                                        formatter_class=CustomHelpFormatter,
+                                        description='Calculate tetranucleotide signature of scaffolds.')
+    tetra_parser.add_argument('genome_dir', help="directory containing genomes")
+    tetra_parser.add_argument('scaffold_file', help="scaffolds binned to generate putative genomes")
+    tetra_parser.add_argument('output_file', help="output file indicating tetranucleotide signatures")
+    tetra_parser.add_argument('--genome_ext', default='fna', help="extension of genomes (other files in folder are ignored)")
+    tetra_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
 
     # get and check options
     args = None

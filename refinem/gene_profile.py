@@ -30,10 +30,14 @@ import operator
 from collections import defaultdict, namedtuple
 
 import biolib.seq_io as seq_io
-from biolib.common import make_sure_path_exists, alphanumeric_sort, remove_extension
+from biolib.common import (make_sure_path_exists,
+                            alphanumeric_sort,
+                            remove_extension,
+                            concatenate_files)
 from biolib.blast_parser import BlastParser
 from biolib.external.diamond import Diamond
 from biolib.taxonomy import Taxonomy
+from biolib.plots.krona import Krona
 
 from numpy import mean
 
@@ -41,7 +45,16 @@ from numpy import mean
 """
 To Do:
  1. Need to get GC and coverage (and possibily tetras) into the mix
- 7. svg pie charts for each genome at each rank [top X, unclassified, other]
+ 2. Both the GeneProfile and Profile classes are very, very similar to classes
+    in taxonomic_profile.py. These classes should be generalized and combined.
+ *3. Need to enforce a taxonomically consistent classification for scaffolds in the
+     taxa_profile and gene_profile methods. Without this, the Krona plot can give weird
+     results (k__Bactera; p__Euryarchaeota). How to result this is an interesting question
+     as the majority of genes could indicate Bacteria, but be spread over many different phyla
+     so that Euryarchaeota is the majority classification at the phylum level.
+ 4. Report results should give profiles as 1) % scaffolds, 2) % genes, 3) % coding bases
+ 5. Make sure there is a table indicating the classification of each scaffold for use in identifying
+    contamination
 """
 
 
@@ -49,11 +62,14 @@ class GeneProfile(object):
     """Create taxonomic profiles of genes across scaffolds within a genome.
 
     Genes are classified through homolog search against a
-    database of reference genomes. Currently, homology search
+    database of reference genomes. Currently, homology search with
     diamond is supported. Each scaffold is assigned using a majority
     vote at each taxonomic rank. The taxonomic profile of a genome
-    is given as both the total number of scaffolds and genes assigned
-    to each taxa.
+    is given as the total number of scaffolds, total number of genes,
+    and total number of coding bases assigned to each taxa.
+
+    Note: this class deliberately ignores short scaffolds that do not
+          contain at least one gene.
     """
 
     def __init__(self, cpus, output_dir):
@@ -77,13 +93,11 @@ class GeneProfile(object):
         # profile for each genome
         self.profiles = {}
 
-    def taxonomic_profiles(self, genome_id, table, taxonomy):
+    def taxonomic_profiles(self, table, taxonomy):
         """Create taxonomic profiles.
 
         Parameters
         ----------
-        genome_id : str
-            Desired name of genome.
         table : str
             Table containing hits to genomic fragments.
         taxonomy : dict[ref_genome_id] -> [domain, phylum, ..., species]
@@ -92,11 +106,9 @@ class GeneProfile(object):
 
         blast_parser = BlastParser()
 
-        self.profiles[genome_id] = Profile(genome_id)
-
         hit_summary = defaultdict(lambda: defaultdict(int))
         for hit in blast_parser.read_hit(table):
-            seq_id = hit.query_id[0:hit.query_id.rfind('~')]
+            seq_id, genome_id = hit.query_id.split('~')
             scaffold_id = seq_id[0:seq_id.rfind('_')]
             ref_genome_id = hit.subject_id[hit.subject_id.rfind('~') + 1:]
 
@@ -107,13 +119,6 @@ class GeneProfile(object):
                                              hit.aln_length)
 
             hit_summary[genome_id][ref_genome_id] += 1
-
-        fout = open('hit_summary.tsv', 'w')
-        fout.write('Genome id\tReference genome id\t# hits\tTaxonomy\n')
-        for genome_id in hit_summary:
-            for ref_genome_id, num_hits in hit_summary[genome_id].iteritems():
-                fout.write('%s\t%s\t%d\t%s\n' % (genome_id, ref_genome_id, num_hits, ';'.join(taxonomy[ref_genome_id])))
-        fout.close()
 
     def write_genome_summary(self, output_file):
         """Summarize classification of each genome.
@@ -163,43 +168,44 @@ class GeneProfile(object):
         self.logger.info('  Reading taxonomic assignment of reference genomes.')
         taxonomy = Taxonomy().read(taxonomy_file)
 
-        # run diamond and create taxonomic profile for each genome
-        self.logger.info('')
-        self.logger.info('  Running diamond blastp with %d processes:' % self.cpus)
+        # concatenate gene files
+        diamond_output_dir = os.path.join(self.output_dir, 'diamond')
+        make_sure_path_exists(diamond_output_dir)
 
-        hit_dir = os.path.join(self.output_dir, 'hits')
-        make_sure_path_exists(hit_dir)
+        gene_file = os.path.join(diamond_output_dir, 'genes.faa')
+        concatenate_files(gene_files, gene_file)
 
-        diamond = Diamond(self.cpus)
-        for i, aa_file in enumerate(gene_files):
-            status = 'Finished processing %d of %d (%.2f%%) genomes.' % (i + 1, len(gene_files), (i + 1) * 100.0 / len(gene_files))
-            sys.stdout.write('    %s\r' % status)
-            sys.stdout.flush()
+        # record length and number of genes in each scaffold
+        for aa_file in gene_files:
+            genome_id = remove_extension(aa_file, '.genes.faa')
+            self.profiles[genome_id] = Profile(genome_id)
 
-            # run diamond
-            diamond_daa_out = os.path.join(hit_dir, remove_extension(aa_file) + '.hits')
-            diamond.blastp(aa_file, db_file, evalue, per_identity, 1, diamond_daa_out)
-
-            diamond_table_out = os.path.join(hit_dir, remove_extension(aa_file) + '.hits.tsv')
-            diamond.view(diamond_daa_out + '.daa', diamond_table_out)
-
-            # create taxonomic profile for each genome
-            genome_id = remove_extension(aa_file)
-            self.taxonomic_profiles(genome_id, diamond_table_out, taxonomy)
-
-            # record length and number of genes in each scaffold
             for seq_id, seq in seq_io.read_seq(aa_file):
                 seq_id = seq_id[0:seq_id.rfind('~')]
                 scaffold_id = seq_id[0:seq_id.rfind('_')]
                 self.profiles[genome_id].genes_in_scaffold[scaffold_id] += 1
                 self.profiles[genome_id].coding_bases[scaffold_id] += len(seq)
 
-        sys.stdout.write('\n')
+        # run diamond and create taxonomic profile for each genome
+        self.logger.info('')
+        self.logger.info('  Running diamond blastp with %d processes (be patient!)' % self.cpus)
+
+        diamond = Diamond(self.cpus)
+        diamond_daa_out = os.path.join(diamond_output_dir, 'diamond_hits')
+        diamond.blastp(gene_file, db_file, evalue, per_identity, 1, diamond_daa_out)
+
+        diamond_table_out = os.path.join(diamond_output_dir, 'diamond_hits.tsv')
+        diamond.view(diamond_daa_out + '.daa', diamond_table_out)
+
+        # create taxonomic profile for each genome
+        self.logger.info('')
+        self.logger.info('  Creating taxonomic profile for each genome.')
+        self.taxonomic_profiles(diamond_table_out, taxonomy)
 
         # write out taxonomic profile
         self.logger.info('')
         self.logger.info('  Writing taxonomic profile for each genome.')
-        report_dir = os.path.join(self.output_dir, 'reports')
+        report_dir = os.path.join(self.output_dir, 'bin_reports')
         make_sure_path_exists(report_dir)
         for genome_id, profile in self.profiles.iteritems():
             seq_summary_out = os.path.join(report_dir, genome_id + '.sequences.tsv')
@@ -211,6 +217,22 @@ class GeneProfile(object):
         # create summary report for all genomes
         genome_summary_out = os.path.join(self.output_dir, 'genome_summary.tsv')
         self.write_genome_summary(genome_summary_out)
+
+        # create Krona plot
+        krona_profiles = defaultdict(lambda: defaultdict(int))
+        for genome_id, profile in self.profiles.iteritems():
+            seq_assignments = profile.classify_seqs()
+
+            for seq_id, classification in seq_assignments.iteritems():
+                taxa = []
+                for r in xrange(0, len(profile.rank_labels)):
+                    taxa.append(classification[r][0])
+
+                krona_profiles[genome_id][';'.join(taxa)] += profile.genes_in_scaffold[seq_id]
+
+        krona = Krona()
+        krona_output_file = os.path.join(self.output_dir, 'taxonomic_profiles.krona.html')
+        krona.create(krona_profiles, krona_output_file)
 
 
 class Profile(object):
@@ -239,9 +261,6 @@ class Profile(object):
                                                 aln_length""")
         self.hits = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
 
-        # total fragments from genome
-        self.total_fragments = 0
-
         # number of coding bases in scaffold
         self.coding_bases = defaultdict(int)
 
@@ -269,47 +288,47 @@ class Profile(object):
         for i, taxa in enumerate(taxonomy):
             d[i][taxa].append(self.HitInfo(evalue, perc_identity, aln_length))
 
-    def classify_seqs(self, rank):
-        """Classify sequences at a given taxonomic rank.
+    def classify_seqs(self):
+        """Classify sequences.
 
         Sequences are classified using a majority vote
         over all fragments originating from the sequence
         with a valid hit. If less than 20% of fragments have
         a valid hit, the sequence is considered unclassified.
-
-        Parameters
-        ----------
-        rank : int
-            Desired rank.
+        Classification is performed from the highest (domain)
+        to lowest (species) rank. If a rank is taxonomically
+        inconsistent with a higher ranks classification, this
+        rank and all lower ranks are set to unclassified.
 
         Returns
         -------
-        dict : d[seq_id] -> [taxa, HitInfo]
+        dict : d[contig_id][rank] -> [taxa, HitInfo]
             Classification of each sequence along with summary statistics
             of hits to the specified taxa.
         """
 
         # classify each sequence using a majority vote
-        seq_assignments = defaultdict(lambda: defaultdict(str))
-
+        seq_assignments = defaultdict(lambda: defaultdict(list))
         for seq_id, rank_hits in self.hits.iteritems():
-            taxa = max(rank_hits[rank], key=lambda x: len(rank_hits[rank][x]))
-            count = len(rank_hits[rank][taxa])
+            for rank in xrange(0, len(self.rank_prefixes)):
+                taxa = max(rank_hits[rank], key=lambda x: len(rank_hits[rank][x]))
+                count = len(rank_hits[rank][taxa])
 
-            if count >= self.percent_to_classify * self.genes_in_scaffold[seq_id]:
-                seq_assignments[seq_id] = [taxa, rank_hits[rank][taxa]]
-            else:
-                seq_assignments[seq_id] = [self.unclassified, None]
+                if count >= self.percent_to_classify * self.genes_in_scaffold[seq_id]:
+                    seq_assignments[seq_id][rank] = [taxa, rank_hits[rank][taxa]]
+                else:
+                    seq_assignments[seq_id][rank] = [self.unclassified, None]
 
         # identify sequences with no hits
-        for seq_id in self.coding_bases:
+        for seq_id in self.genes_in_scaffold:
             if seq_id not in seq_assignments:
-                seq_assignments[seq_id] = [self.unclassified, None]
+                for rank in xrange(0, len(self.rank_prefixes)):
+                    seq_assignments[seq_id][rank] = [self.unclassified, None]
 
         return seq_assignments
 
-    def profile_at_rank(self, rank):
-        """Return profile at a given taxonomic rank.
+    def profile(self):
+        """Relative abundance profile at each taxonomic rank.
 
         Relative abundance is derived from the number
         of base pairs assigned to a given taxa.
@@ -321,75 +340,51 @@ class Profile(object):
 
         Returns
         -------
-        dict : d[taxa] -> percentage
+        dict : d[rank][taxa] -> percentage
             Relative abundance of taxa at a given rank.
-        dict : d[taxa] -> TaxaInfo
+        dict : d[rank][taxa] -> TaxaInfo
            Statistics for each taxa.
         """
 
-        seq_assignments = self.classify_seqs(rank)
+        seq_assignments = self.classify_seqs()
 
-        total_bps = sum(self.coding_bases.values())
+        total_coding_bps = sum(self.coding_bases.values())
 
-        profile = defaultdict(float)
-        hit_stats = defaultdict(list)
-        num_seqs = defaultdict(int)
-        num_basepairs = defaultdict(int)
-        for seq_id, data in seq_assignments.iteritems():
-            taxa, hit_info = data
-            profile[taxa] += float(self.coding_bases[seq_id]) / total_bps
-            num_seqs[taxa] += 1
-            num_basepairs[taxa] += self.coding_bases[seq_id]
+        profile = defaultdict(lambda: defaultdict(float))
+        stats = defaultdict(dict)
 
-            if taxa != self.unclassified:
-                hit_stats[taxa].extend(hit_info)
+        for r in xrange(0, len(self.rank_labels)):
+            num_seqs = defaultdict(int)
+            num_basepairs = defaultdict(int)
+            hit_stats = defaultdict(list)
+            for seq_id, data in seq_assignments.iteritems():
+                taxa, hit_info = data[r]
+                profile[r][taxa] += float(self.coding_bases[seq_id]) / total_coding_bps
+                num_seqs[taxa] += 1
+                num_basepairs[taxa] += self.coding_bases[seq_id]
 
-        # calculate averages of hit statistics
-        stats = {}
-        for taxa, hit_info in hit_stats.iteritems():
-            avg_evalue = mean([x.evalue for x in hit_info])
-            avg_perc_identity = mean([x.perc_identity for x in hit_info])
-            avg_aln_length = mean([x.aln_length for x in hit_info])
+                if taxa != self.unclassified:
+                    hit_stats[taxa].extend(hit_info)
 
-            stats[taxa] = self.TaxaInfo(avg_evalue,
-                                        avg_perc_identity,
-                                        avg_aln_length,
-                                        num_seqs[taxa],
-                                        num_basepairs[taxa])
+            # calculate averages of hit statistics
+            for taxa, hit_info in hit_stats.iteritems():
+                avg_evalue = mean([x.evalue for x in hit_info])
+                avg_perc_identity = mean([x.perc_identity for x in hit_info])
+                avg_aln_length = mean([x.aln_length for x in hit_info])
 
-        stats[self.unclassified] = self.TaxaInfo(None,
-                                                 None,
-                                                 None,
-                                                 num_seqs[self.unclassified],
-                                                 num_basepairs[self.unclassified])
+                stats[r][taxa] = self.TaxaInfo(avg_evalue,
+                                            avg_perc_identity,
+                                            avg_aln_length,
+                                            num_seqs[taxa],
+                                            num_basepairs[taxa])
+
+            stats[r][self.unclassified] = self.TaxaInfo(None,
+                                                     None,
+                                                     None,
+                                                     num_seqs[self.unclassified],
+                                                     num_basepairs[self.unclassified])
 
         return profile, stats
-
-    def print_summary(self, rank):
-        """Print profile summary at specified rank.
-
-        Parameters
-        ----------
-        rank : int
-            Desired rank.
-        """
-
-        profile, stats = self.profile_at_rank(rank)
-
-        for taxa, percent in profile.iteritems():
-            if taxa != self.unclassified:
-                print '%s\t%.2f\t%d\t%d\t%.1g\t%.1f\t%.1f' % (taxa,
-                                                      percent,
-                                                      stats[taxa].num_seqs,
-                                                      stats[taxa].num_basepairs,
-                                                      stats[taxa].evalue,
-                                                      stats[taxa].perc_identity,
-                                                      stats[taxa].aln_length)
-            else:
-                print '%s\t%.2f\t%d\t%d' % (taxa,
-                                            percent,
-                                            stats[taxa].num_seqs,
-                                            stats[taxa].num_basepairs)
 
     def write_genome_summary(self, fout):
         """Write most abundant taxa at each rank.
@@ -400,25 +395,25 @@ class Profile(object):
             Output stream.
         """
 
+        profile, stats = self.profile()
+
         fout.write('%s\t%d\t%d' % (self.genome_id, sum(self.coding_bases.values()), len(self.coding_bases)))
         for r in xrange(0, len(self.rank_labels)):
-            profile, stats = self.profile_at_rank(r)
+            taxa, percent = max(profile[r].iteritems(), key=operator.itemgetter(1))
 
-            taxa, percent = max(profile.iteritems(), key=operator.itemgetter(1))
-
-            total_seq = sum([stats[t].num_seqs for t in stats])
+            total_seq = sum([stats[r][t].num_seqs for t in stats[r]])
 
             if taxa != self.unclassified:
                 fout.write('\t%s\t%.2f\t%.2f\t%.1g\t%.1f\t%.1f' % (taxa,
                                                               percent * 100,
-                                                              stats[taxa].num_seqs * 100.0 / total_seq,
-                                                              stats[taxa].evalue,
-                                                              stats[taxa].perc_identity,
-                                                              stats[taxa].aln_length))
+                                                              stats[r][taxa].num_seqs * 100.0 / total_seq,
+                                                              stats[r][taxa].evalue,
+                                                              stats[r][taxa].perc_identity,
+                                                              stats[r][taxa].aln_length))
             else:
                 fout.write('\t%s\t%.2f\t%.2f\t%s\t%s\t%s' % (taxa,
                                                           percent * 100,
-                                                          stats[taxa].num_seqs * 100.0 / total_seq,
+                                                          stats[r][taxa].num_seqs * 100.0 / total_seq,
                                                           'na',
                                                           'na',
                                                           'na'))
@@ -440,25 +435,23 @@ class Profile(object):
                 fout.write('\t')
 
             fout.write(rank + ': taxa')
-            fout.write('\t' + rank + ': percent of bps')
+            fout.write('\t' + rank + ': percent of coding bps')
             fout.write('\t' + rank + ': percent of sequences')
             fout.write('\t' + rank + ': avg. evalue')
             fout.write('\t' + rank + ': avg. perc identity')
-            fout.write('\t' + rank + ': avg. align length (AA)')
+            fout.write('\t' + rank + ': avg. align length (aa)')
         fout.write('\n')
 
         # sort profiles in descending order of abundance
+        profile, stats = self.profile()
+
         sorted_profiles = {}
-        stats_dict = {}
         max_taxa = 0
         for r in xrange(0, len(self.rank_labels)):
-            profile, stats = self.profile_at_rank(r)
-
-            sorted_profile = sorted(profile.items(), key=operator.itemgetter(1))
+            sorted_profile = sorted(profile[r].items(), key=operator.itemgetter(1))
             sorted_profile.reverse()
 
             sorted_profiles[r] = sorted_profile
-            stats_dict[r] = stats
 
             if len(sorted_profiles) > max_taxa:
                 max_taxa = len(sorted_profiles)
@@ -470,22 +463,21 @@ class Profile(object):
                     fout.write('\t')
 
                 if len(sorted_profiles[r]) > i:
-                    stats = stats_dict[r]
-                    total_seq = sum([stats[t].num_seqs for t in stats])
+                    total_seq = sum([stats[r][t].num_seqs for t in stats[r]])
 
                     taxa, percent = sorted_profiles[r][i]
 
                     if taxa != self.unclassified:
                         fout.write('%s\t%.2f\t%.2f\t%.1g\t%.1f\t%.1f' % (taxa,
                                                                       percent * 100,
-                                                                      stats[taxa].num_seqs * 100.0 / total_seq,
-                                                                      stats[taxa].evalue,
-                                                                      stats[taxa].perc_identity,
-                                                                      stats[taxa].aln_length))
+                                                                      stats[r][taxa].num_seqs * 100.0 / total_seq,
+                                                                      stats[r][taxa].evalue,
+                                                                      stats[r][taxa].perc_identity,
+                                                                      stats[r][taxa].aln_length))
                     else:
                         fout.write('%s\t%.2f\t%.2f\t%s\t%s\t%s' % (taxa,
                                                                   percent * 100,
-                                                                  stats[taxa].num_seqs * 100.0 / total_seq,
+                                                                  stats[r][taxa].num_seqs * 100.0 / total_seq,
                                                                   'na',
                                                                   'na',
                                                                   'na'))
@@ -503,9 +495,7 @@ class Profile(object):
             Output file.
         """
 
-        seq_assignments = {}
-        for r in xrange(0, len(self.rank_labels)):
-            seq_assignments[r] = self.classify_seqs(r)
+        seq_assignments = self.classify_seqs()
 
         fout = open(output_file, 'w')
         fout.write('Sequence id\tCoding bases (bp)\t# genes')
@@ -517,14 +507,13 @@ class Profile(object):
             fout.write('\t' + rank + ': avg. align length (AA)')
         fout.write('\n')
 
-        for seq_id, data in seq_assignments[0].iteritems():
-            taxa, _hit_info = data
+        for seq_id in seq_assignments:
             fout.write('%s\t%d\t%d' % (seq_id,
                                        self.coding_bases[seq_id],
                                        self.genes_in_scaffold[seq_id]))
 
             for r in xrange(0, len(self.rank_labels)):
-                taxa, hit_info = seq_assignments[r][seq_id]
+                taxa, hit_info = seq_assignments[seq_id][r]
 
                 if taxa != self.unclassified:
                     avg_evalue = mean([x.evalue for x in hit_info])
