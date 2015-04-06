@@ -24,6 +24,7 @@ from refinem.gene_profile import GeneProfile
 from refinem.bin_comparer import BinComparer
 from refinem.reference import Reference
 from refinem.unbinned import Unbinned
+from refinem.coverage import Coverage
 from refinem.tetranucleotide import Tetranucleotide
 
 import biolib.seq_io as seq_io
@@ -31,10 +32,19 @@ import biolib.genome_tk as genome_tk
 from biolib.common import (make_sure_path_exists,
                            check_dir_exists,
                            remove_extension,
-                           check_file_exists)
+                           check_file_exists,
+                           query_yes_no)
 from biolib.external.prodigal import Prodigal
 from biolib.misc.time_keeper import TimeKeeper
 from biolib.external.execute import check_dependencies
+
+
+"""
+To do:
+1. Need to consider when a command should take called genes instead of nucleotide sequences.
+2. The reference command should only call genes on scaffolds that are not binned, otherwise it
+   should use the called genes for the bin.
+"""
 
 
 class OptionsParser():
@@ -71,6 +81,31 @@ class OptionsParser():
             sys.exit()
 
         return genome_files
+        
+    def _check_nuclotide_seqs(self, seq_files):
+        """Check if files contain sequences in nucleotide space.
+        
+        Parameters
+        ----------
+        seq_files : iterable
+            Sequence files to check.
+            
+        Returns
+        -------
+        boolean
+            True if files can be treated as containing nucleotide sequences.
+        """
+        
+        for seq_file in seq_files:
+            if not seq_io.is_nucleotide(seq_file):
+                print('Expected all files to contain sequenes in nucleotide space.')
+                print('File %s appears like it may contain amino acids sequences.' % seq_file)
+                
+                yes_response = query_yes_no('Do all files contain only nucleotide sequences?', default='no')
+                if not yes_response:
+                    return False
+                    
+        return True
 
     def taxa_profile(self, options):
         """Call genes command"""
@@ -85,6 +120,9 @@ class OptionsParser():
         check_file_exists(options.db_file)
 
         genome_files = self._genome_files(options.genome_dir, options.genome_ext)
+        if not self._check_nuclotide_seqs(genome_files):
+            self.logger.warning('[Warning] All files must contain nucleotide sequences.')
+            sys.exit()
 
         taxonomic_profile = TaxonomicProfile(options.cpus, options.output_dir)
         taxonomic_profile.run(genome_files,
@@ -113,6 +151,9 @@ class OptionsParser():
         check_file_exists(options.db_file)
 
         genome_files = self._genome_files(options.genome_dir, options.genome_ext)
+        if not self._check_nuclotide_seqs(genome_files):
+            self.logger.warning('[Warning] All files must contain nucleotide sequences.')
+            sys.exit()
 
         # call genes for each genome
         prodigal = Prodigal(options.cpus)
@@ -204,6 +245,29 @@ class OptionsParser():
 
         self.logger.info('')
         self.logger.info('  Modified genome written to: ' + options.output_file)
+
+        self.time_keeper.print_time_stamp()
+        
+    def call_genes(self, options):
+        """Call genes command"""
+        self.logger.info('')
+        self.logger.info('*******************************************************************************')
+        self.logger.info(' [RefineM - call_genes] Identifying genes within genomes.')
+        self.logger.info('*******************************************************************************')
+        self.logger.info('')
+
+        make_sure_path_exists(options.output_dir)
+
+        genome_files = self._genome_files(options.genome_dir, options.genome_ext)
+        if not self._check_nuclotide_seqs(genome_files):
+            self.logger.warning('[Warning] All files must contain nucleotide sequences.')
+            sys.exit()
+
+        prodigal = Prodigal(options.cpus, options.genes, options.output_dir)
+        prodigal.run(genome_files)
+
+        self.logger.info('')
+        self.logger.info('  Identified genes written to: %s' % options.output_dir)
 
         self.time_keeper.print_time_stamp()
 
@@ -338,6 +402,24 @@ class OptionsParser():
         self.logger.info('  Unbinned scaffolds written to: ' + options.output_file)
 
         self.time_keeper.print_time_stamp()
+        
+    def coverage(self, options):
+        """Coverage command"""
+        self.logger.info('')
+        self.logger.info('*******************************************************************************')
+        self.logger.info(' [RefineM - coverage] Calculating coverage of scaffolds.')
+        self.logger.info('*******************************************************************************')
+        self.logger.info('')
+        
+        genome_files = self._genome_files(options.genome_dir, options.genome_ext)
+        
+        coverage = Coverage(options.cpus)
+        coverage.run(genome_files, options.bam_files, options.output_file, options.all_reads, options.min_align, options.max_edit_dist)
+        
+        self.logger.info('')
+        self.logger.info('  Coverage information written to: ' + options.output_file)
+            
+        self.time_keeper.print_time_stamp()
 
     def tetra(self, options):
         """Tetra usage command"""
@@ -404,6 +486,8 @@ class OptionsParser():
             self.bin_compare(options)
         elif(options.subparser_name == 'reference'):
             self.reference(options)
+        elif(options.subparser_name == 'call_genes'):
+            self.call_genes(options)
         elif(options.subparser_name == 'unbinned'):
             self.unbinned(options)
         elif(options.subparser_name == 'tetra'):

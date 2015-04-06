@@ -80,8 +80,9 @@ def print_help():
      bin_union    -> [not implemented] Merge multiple binning efforts into a single bin set
 
     Utility functions:
+     call_genes   -> Identify genes within genomes
      unbinned     -> Identify unbinned scaffolds
-     coverage     -> [not implemented] Calculate coverage of sequences
+     coverage     -> Calculate coverage of sequences
      tetra        -> Calculate tetranucleotide signature of sequences
 
   Use: refinem <command> -h for command specific help.
@@ -108,7 +109,7 @@ if __name__ == '__main__':
     taxa_profile_parser.add_argument('-p', '--per_identity', type=float, default=30.0, help="percent identity of valid hits")
     taxa_profile_parser.add_argument('-w', '--window_size', type=int, default=500, help="size of fragments to classify")
     taxa_profile_parser.add_argument('-s', '--step_size', type=int, default=500, help="base pairs to shift between fragments")
-    taxa_profile_parser.add_argument('-x', '--genome_ext', default='fna', help="extension of genomes (other files in folder are ignored)")
+    taxa_profile_parser.add_argument('-x', '--genome_ext', default='fna', help="extension of genomes (other files in directory are ignored)")
     taxa_profile_parser.add_argument('--tmpdir', action=ChangeTempAction, default=tempfile.gettempdir(), help="specify alternative directory for temporary files")
     taxa_profile_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
 
@@ -122,7 +123,7 @@ if __name__ == '__main__':
     gene_profile_parser.add_argument('output_dir', help="output directory")
     gene_profile_parser.add_argument('-e', '--evalue', type=float, default=1e-3, help="e-value of valid hits")
     gene_profile_parser.add_argument('-p', '--per_identity', type=float, default=30.0, help="percent identity of valid hits")
-    gene_profile_parser.add_argument('-x', '--genome_ext', default='fna', help="extension of genomes (other files in folder are ignored)")
+    gene_profile_parser.add_argument('-x', '--genome_ext', default='fna', help="extension of genomes (other files in directory are ignored)")
     gene_profile_parser.add_argument('--tmpdir', action=ChangeTempAction, default=tempfile.gettempdir(), help="specify alternative directory for temporary files")
     gene_profile_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
 
@@ -142,7 +143,7 @@ if __name__ == '__main__':
                                             formatter_class=CustomHelpFormatter,
                                             description='Ensure sequences are assigned to a single genome.')
     unique_parser.add_argument('genome_dir', help="directory containing genomes")
-    unique_parser.add_argument('-x', '--genome_ext', default='fna', help="extension of genomes (other files in folder are ignored)")
+    unique_parser.add_argument('-x', '--genome_ext', default='fna', help="extension of genomes (other files in directory are ignored)")
 
     # Compare two sets of bins (e.g., from alternative binning methods)
     bin_compare_parser = subparsers.add_parser('bin_compare',
@@ -168,9 +169,19 @@ if __name__ == '__main__':
     reference_parser.add_argument('--coverage', help="file containing coverage information for each scaffold")
     reference_parser.add_argument('-e', '--evalue', type=float, default=1e-3, help="e-value of valid hits")
     reference_parser.add_argument('-p', '--per_identity', type=float, default=30.0, help="percent identity of valid hits")
-    reference_parser.add_argument('-x', '--genome_ext', default='fna', help="extension of genomes (other files in folder are ignored)")
+    reference_parser.add_argument('-x', '--genome_ext', default='fna', help="extension of genomes (other files in directory are ignored)")
     reference_parser.add_argument('--tmpdir', action=ChangeTempAction, default=tempfile.gettempdir(), help="specify alternative directory for temporary files")
     reference_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
+
+    # identify genes within genomes
+    call_genes_parser = subparsers.add_parser('call_genes',
+                                        formatter_class=CustomHelpFormatter,
+                                        description='Identify genes within genomes.')
+    call_genes_parser.add_argument('genome_dir', help="directory containing genomes")
+    call_genes_parser.add_argument('output_dir', help="output directory")
+    call_genes_parser.add_argument('-g', '--genes', action="store_true", default=False, help="files in genome directory contain genes as amino acids")
+    call_genes_parser.add_argument('--genome_ext', default='fna', help="extension of genomes (other files in directory are ignored)")
+    call_genes_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
 
     # identify unbinned sequences
     unbinned_parser = subparsers.add_parser('unbinned',
@@ -179,8 +190,23 @@ if __name__ == '__main__':
     unbinned_parser.add_argument('genome_dir', help="directory containing genomes")
     unbinned_parser.add_argument('scaffold_file', help="scaffolds binned to generate putative genomes")
     unbinned_parser.add_argument('output_file', help="output file containing unbinned scaffolds")
-    unbinned_parser.add_argument('-x', '--genome_ext', default='fna', help="extension of genomes (other files in folder are ignored)")
+    unbinned_parser.add_argument('-x', '--genome_ext', default='fna', help="extension of genomes (other files in directory are ignored)")
     unbinned_parser.add_argument('-s', '--min_seq_len', type=int, default=0, help="ignore scaffolds shorter than the specified length")
+
+    # Calculate coverage
+    coverage_parser = subparsers.add_parser('coverage', 
+                                            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                            description='Calculate coverage of sequences.',
+                                            epilog='Example: checkm coverage ./bins coverage.tsv example_1.bam example_2.bam')
+    
+    coverage_parser.add_argument('genome_dir', help="directory containing genomes")
+    coverage_parser.add_argument('output_file', help="output file with coverage profiles")
+    coverage_parser.add_argument('bam_files', nargs='+', help="BAM files to parse")
+    coverage_parser.add_argument('--genome_ext', default='fna', help="extension of genomes (other files in directory are ignored)")
+    coverage_parser.add_argument('-r', '--all_reads', action='store_true', help="use all reads to estimate coverage instead of just those in proper pairs")
+    coverage_parser.add_argument('-a', '--min_align', help='minimum alignment length as percentage of read length', type=float, default = 0.98)
+    coverage_parser.add_argument('-e', '--max_edit_dist', help='maximum edit distance as percentage of read length', type=float, default = 0.02)
+    coverage_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
 
     # calculate tetranucleotide signatures
     tetra_parser = subparsers.add_parser('tetra',
@@ -189,7 +215,7 @@ if __name__ == '__main__':
     tetra_parser.add_argument('genome_dir', help="directory containing genomes")
     tetra_parser.add_argument('scaffold_file', help="scaffolds binned to generate putative genomes")
     tetra_parser.add_argument('output_file', help="output file indicating tetranucleotide signatures")
-    tetra_parser.add_argument('--genome_ext', default='fna', help="extension of genomes (other files in folder are ignored)")
+    tetra_parser.add_argument('--genome_ext', default='fna', help="extension of genomes (other files in directory are ignored)")
     tetra_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
 
     # get and check options
