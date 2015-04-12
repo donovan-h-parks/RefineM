@@ -81,7 +81,7 @@ class ReadLoader:
 
 class CoverageStruct():
     """Coverage information for scaffolds."""
-    
+
     def __init__(self, seq_len, mapped_reads, coverage):
         self.seq_len = seq_len
         self.mapped_reads = mapped_reads
@@ -89,46 +89,46 @@ class CoverageStruct():
 
 class Coverage():
     """Calculate coverage of all sequences."""
-    
+
     def __init__(self, cpus):
         self.logger = logging.getLogger()
-        
-        self.cpus = cpus 
+
+        self.cpus = cpus
 
     def run(self, genome_files, bam_files, out_file, all_reads, min_align_per, max_edit_dist_per):
         """Calculate coverage of sequences for each BAM file."""
-        
+
         # determine genome assignment of each scaffold
         self.logger.info('  Determining genome assignment of each scaffold.')
-            
+
         seq_id_genome_id = {}
         for genome_file in genome_files:
             genome_id = remove_extension(genome_file)
-            for seq_id, _seq in read_seq(genome_file):
+            for seq_id, _seq in seq_io.read_seq(genome_file):
                 seq_id_genome_id[seq_id] = genome_id
-        
+
         # process each fasta file
         self.logger.info("  Processing %d file(s) with %d cpus.\n" % (len(bam_files), self.cpus))
-            
+
         # make sure all BAM files are sorted
-        for bam_file in bam_files: 
+        for bam_file in bam_files:
             if not os.path.exists(bam_file + '.bai'):
                 self.logger.error('  [Error] BAM file is not sorted: ' + bam_file + '\n')
                 sys.exit()
- 
+
         # calculate coverage of each BAM file
         coverage_info = {}
-        for i, bam_file in enumerate(bam_files): 
+        for i, bam_file in enumerate(bam_files):
             self.logger.info('  Processing %s (%d of %d):' % (ntpath.basename(bam_file), i+1, len(bam_files)))
-            
+
             coverage_info[bam_file] = mp.Manager().dict()
-            coverage_info[bam_file] = self._process_bam(bam_file, all_reads, min_align_per, max_edit_dist_per, coverage_info[bam_file]) 
-   
+            coverage_info[bam_file] = self._process_bam(bam_file, all_reads, min_align_per, max_edit_dist_per, coverage_info[bam_file])
+
         fout = open(out_file, 'w')
         header = 'Scaffold Id\tGenome Id\tScaffold length (bp)'
         for _ in bam_files:
             header += '\tBam Id\tCoverage\tMapped reads'
-        
+
         fout.write(header + '\n')
 
         for seq_id in coverage_info[coverage_info.keys()[0]].keys():
@@ -137,7 +137,7 @@ class Coverage():
                 bam_id = remove_extension(bam_file)
                 row_str += '\t' + bam_id + '\t' + str(coverage_info[bam_file][seq_id].coverage) + '\t' + str(coverage_info[bam_file][seq_id].mapped_reads)
             fout.write(row_str + '\n')
-            
+
         fout.close()
 
     def _process_bam(self, bam_file, all_reads, min_align_per, max_edit_dist_per, coverage_info):
@@ -147,9 +147,9 @@ class Coverage():
         worker_queue = mp.Queue()
         writer_queue = mp.Queue()
 
-        bam_file = pysam.Samfile(bam_file, 'rb')
-        ref_seq_ids = bam_file.references
-        ref_seq_lens = bam_file.lengths
+        bamfile = pysam.Samfile(bam_file, 'rb')
+        ref_seq_ids = bamfile.references
+        ref_seq_lens = bamfile.lengths
 
         # populate each thread with reference scaffolds to process
         # Note: reference scaffolds are sorted by number of mapped reads
@@ -197,12 +197,12 @@ class Coverage():
                 p.terminate()
 
             write_proc.terminate()
-               
+
         return coverage_info
-                   
+
     def _worker(self, bam_file, all_reads, min_align_per, max_edit_dist_per, queue_in, queue_out):
         """Process scaffold in parallel.
-        
+
         Parameters
         ----------
         bam_file : str
@@ -226,21 +226,21 @@ class Coverage():
             bamfile = pysam.Samfile(bam_file, 'rb')
 
             for seq_id, seq_len in zip(seq_ids, seq_lens):
-                readLoader = ReadLoader(seq_len, all_reads, min_align_per, max_edit_dist_per)
+                readLoader = ReadLoader(all_reads, min_align_per, max_edit_dist_per)
                 bamfile.fetch(seq_id, 0, seq_len, callback = readLoader)
 
                 coverage = float(readLoader.coverage) / seq_len
 
-                queue_out.put((seq_id, seq_len, coverage, readLoader.num_reads, 
-                                readLoader.num_duplicates, readLoader.num_secondary, readLoader.num_failed_qc, 
-                                readLoader.num_failed_align_len, readLoader.num_failed_edit_dist, 
+                queue_out.put((seq_id, seq_len, coverage, readLoader.num_reads,
+                                readLoader.num_duplicates, readLoader.num_secondary, readLoader.num_failed_qc,
+                                readLoader.num_failed_align_len, readLoader.num_failed_edit_dist,
                                 readLoader.num_failed_proper_pair, readLoader.num_mapped_reads))
 
             bamfile.close()
 
     def _writer(self, coverage_info, num_reference_seqs, writer_queue):
         """Record coverage information for each scaffold.
-        
+
         Parameters
         ----------
         coverage_info : managed dictionary
@@ -279,12 +279,12 @@ class Coverage():
                 total_failed_edit_dist += num_failed_edit_dist
                 total_failed_proper_pair += num_failed_proper_pair
                 total_mapped_reads += num_mapped_reads
-                
+
             coverage_info[seq_id] = CoverageStruct(seq_len = seq_len, mapped_reads = num_mapped_reads, coverage = coverage)
 
         if self.logger.getEffectiveLevel() <= logging.INFO:
             sys.stderr.write('\n')
-            
+
             print ''
             print '    # total reads: %d' % total_reads
             print '      # properly mapped reads: %d (%.1f%%)' % (total_mapped_reads, float(total_mapped_reads)*100/total_reads)
@@ -295,34 +295,33 @@ class Coverage():
             print '      # reads failing edit distance: %d (%.1f%%)' % (total_failed_edit_dist, float(total_failed_edit_dist)*100/total_reads)
             print '      # reads not properly paired: %d (%.1f%%)' % (total_failed_proper_pair, float(total_failed_proper_pair)*100/total_reads)
             print ''
-            
+
     def parse_coverage(self, coverage_file):
         """Read coverage information from file.
-        
+
         Parameters
         ----------
         coverage_file : str
             File containing coverage profiles.
-        
+
         Returns
         -------
         dict : d[genome_id][scaffold_id][bam_id] -> coverage
             Coverage profile for each genome.
         """
-        
+
         coverage_stats = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
         with open(coverage_file) as f:
             f.readline()
-            
+
             for line in f:
                 line_split = line.split('\t')
                 scaffold_id = line_split[0]
                 genome_id = line_split[1]
-  
+
                 for i in xrange(3, len(line_split), 3):
                     bam_id = line_split[i]
                     coverage = float(line_split[i+1])
                     coverage_stats[genome_id][scaffold_id][bam_id] = coverage
-                
+
         return coverage_stats
-                    

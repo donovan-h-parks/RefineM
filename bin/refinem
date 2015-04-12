@@ -76,14 +76,16 @@ def print_help():
 
     Genome validation and exploration:
      unique       -> Ensure sequences are assigned to a single genome
+     unbinned     -> Identify unbinned scaffolds
      bin_compare  -> Compare two sets of bins/genomes (e.g., from alternative binning methods)
      bin_union    -> [not implemented] Merge multiple binning efforts into a single bin set
 
-    Utility functions:
-     call_genes   -> Identify genes within genomes
-     unbinned     -> Identify unbinned scaffolds
+    Scaffold statistics:
      coverage     -> Calculate coverage of sequences
      tetra        -> Calculate tetranucleotide signature of sequences
+
+    Utility functions:
+     call_genes   -> Identify genes within genomes
 
   Use: refinem <command> -h for command specific help.
 
@@ -194,11 +196,11 @@ if __name__ == '__main__':
     unbinned_parser.add_argument('-s', '--min_seq_len', type=int, default=0, help="ignore scaffolds shorter than the specified length")
 
     # Calculate coverage
-    coverage_parser = subparsers.add_parser('coverage', 
+    coverage_parser = subparsers.add_parser('coverage',
                                             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                             description='Calculate coverage of sequences.',
                                             epilog='Example: checkm coverage ./bins coverage.tsv example_1.bam example_2.bam')
-    
+
     coverage_parser.add_argument('genome_dir', help="directory containing genomes")
     coverage_parser.add_argument('output_file', help="output file with coverage profiles")
     coverage_parser.add_argument('bam_files', nargs='+', help="BAM files to parse")

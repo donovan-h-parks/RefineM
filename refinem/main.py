@@ -81,30 +81,30 @@ class OptionsParser():
             sys.exit()
 
         return genome_files
-        
+
     def _check_nuclotide_seqs(self, seq_files):
         """Check if files contain sequences in nucleotide space.
-        
+
         Parameters
         ----------
         seq_files : iterable
             Sequence files to check.
-            
+
         Returns
         -------
         boolean
             True if files can be treated as containing nucleotide sequences.
         """
-        
+
         for seq_file in seq_files:
             if not seq_io.is_nucleotide(seq_file):
                 print('Expected all files to contain sequenes in nucleotide space.')
                 print('File %s appears like it may contain amino acids sequences.' % seq_file)
-                
+
                 yes_response = query_yes_no('Do all files contain only nucleotide sequences?', default='no')
                 if not yes_response:
                     return False
-                    
+
         return True
 
     def taxa_profile(self, options):
@@ -247,7 +247,7 @@ class OptionsParser():
         self.logger.info('  Modified genome written to: ' + options.output_file)
 
         self.time_keeper.print_time_stamp()
-        
+
     def call_genes(self, options):
         """Call genes command"""
         self.logger.info('')
@@ -402,7 +402,7 @@ class OptionsParser():
         self.logger.info('  Unbinned scaffolds written to: ' + options.output_file)
 
         self.time_keeper.print_time_stamp()
-        
+
     def coverage(self, options):
         """Coverage command"""
         self.logger.info('')
@@ -410,15 +410,15 @@ class OptionsParser():
         self.logger.info(' [RefineM - coverage] Calculating coverage of scaffolds.')
         self.logger.info('*******************************************************************************')
         self.logger.info('')
-        
+
         genome_files = self._genome_files(options.genome_dir, options.genome_ext)
-        
+
         coverage = Coverage(options.cpus)
         coverage.run(genome_files, options.bam_files, options.output_file, options.all_reads, options.min_align, options.max_edit_dist)
-        
+
         self.logger.info('')
         self.logger.info('  Coverage information written to: ' + options.output_file)
-            
+
         self.time_keeper.print_time_stamp()
 
     def tetra(self, options):
@@ -490,10 +490,12 @@ class OptionsParser():
             self.call_genes(options)
         elif(options.subparser_name == 'unbinned'):
             self.unbinned(options)
+        elif(options.subparser_name == 'coverage'):
+            self.coverage(options)
         elif(options.subparser_name == 'tetra'):
             self.tetra(options)
         else:
-            self.logger.error('  [Error] Unknown AAI command: ' + options.subparser_name + '\n')
+            self.logger.error('  [Error] Unknown RefineM command: ' + options.subparser_name + '\n')
             sys.exit()
 
         return 0
