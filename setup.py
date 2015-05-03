@@ -14,12 +14,15 @@ setup(
     author_email='donovan.parks@gmail.com',
     packages=['refinem'],
     scripts=['bin/refinem'],
-    package_data={'refinem' : ['VERSION']},
+    package_data={'refinem' : ['VERSION'], '': ['distributions/*.txt']},
     url='http://pypi.python.org/pypi/refinem/',
     license='GPL3',
     description='A toolbox for improving population genomes.',
     long_description=open('README.md').read(),
     install_requires=[
         "numpy >= 1.8.0",
-        "biolib >= 0.0.1"],
+        "matplotlib >= 1.4.0",
+        "biolib >= 0.0.2",
+        "jinja2 >= 2.7.3"
+        "mpld3 >= 0.2"],
 )

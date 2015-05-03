@@ -19,19 +19,25 @@ import os
 import sys
 import logging
 
-from refinem.taxonomic_profile import TaxonomicProfile
+from refinem.scaffold_stats import ScaffoldStats
+from refinem.genome_stats import GenomeStats
 from refinem.gene_profile import GeneProfile
 from refinem.bin_comparer import BinComparer
 from refinem.reference import Reference
 from refinem.unbinned import Unbinned
 from refinem.coverage import Coverage
 from refinem.tetranucleotide import Tetranucleotide
+from refinem.outliers import Outliers
+from refinem.plots.gc_plots import GcPlots
+from refinem.plots.td_plots import TdPlots
+from refinem.plots.cov_perc_plots import CovPercPlots
+from refinem.plots.cov_corr_plots import CovCorrPlots
+from refinem.plots.distribution_plots import DistributionPlots
 
 import biolib.seq_io as seq_io
 import biolib.genome_tk as genome_tk
 from biolib.common import (make_sure_path_exists,
                            check_dir_exists,
-                           remove_extension,
                            check_file_exists,
                            query_yes_no)
 from biolib.external.prodigal import Prodigal
@@ -42,8 +48,6 @@ from biolib.external.execute import check_dependencies
 """
 To do:
 1. Need to consider when a command should take called genes instead of nucleotide sequences.
-2. The reference command should only call genes on scaffolds that are not binned, otherwise it
-   should use the called genes for the bin.
 """
 
 
@@ -77,7 +81,7 @@ class OptionsParser():
                 genome_files.append(os.path.join(genome_dir, f))
 
         if not genome_files:
-            self.logger.warning('  [Warning] No genomes found. Check the --genome_ext flag used to identify genomes.')
+            self.logger.warning('  [Warning] No genomes found. Check the --genome_ext or --protein_ext flag used to identify genomes.')
             sys.exit()
 
         return genome_files
@@ -98,7 +102,7 @@ class OptionsParser():
 
         for seq_file in seq_files:
             if not seq_io.is_nucleotide(seq_file):
-                print('Expected all files to contain sequenes in nucleotide space.')
+                print('Expected all files to contain sequences in nucleotide space.')
                 print('File %s appears like it may contain amino acids sequences.' % seq_file)
 
                 yes_response = query_yes_no('Do all files contain only nucleotide sequences?', default='no')
@@ -107,34 +111,102 @@ class OptionsParser():
 
         return True
 
-    def taxa_profile(self, options):
-        """Call genes command"""
+    def _check_protein_seqs(self, seq_files):
+        """Check if files contain sequences in amino acid space.
+
+        Parameters
+        ----------
+        seq_files : iterable
+            Sequence files to check.
+
+        Returns
+        -------
+        boolean
+            True if files can be treated as containing amino acid sequences.
+        """
+
+        for seq_file in seq_files:
+            if not seq_io.is_protein(seq_file):
+                print('Expected all files to contain sequences in amino acid space.')
+                print('File %s appears like it may contain nucleotide sequences.' % seq_file)
+
+                yes_response = query_yes_no('Do all files contain only amino acid sequences?', default='no')
+                if not yes_response:
+                    return False
+
+        return True
+
+    def scaffold_stats(self, options):
+        """Scaffold statistics command"""
         self.logger.info('')
         self.logger.info('*******************************************************************************')
-        self.logger.info(' [RefineM - taxa_profile] Generating taxonomic profiles from short fragments.')
+        self.logger.info(' [RefineM - scaffold_stats] Calculating statistics for scaffolds.')
         self.logger.info('*******************************************************************************')
-        self.logger.info('')
 
-        make_sure_path_exists(options.output_dir)
-        check_file_exists(options.taxonomy_file)
-        check_file_exists(options.db_file)
+        if not self._check_nuclotide_seqs([options.scaffold_file]):
+            self.logger.warning('[Warning] Scaffold file must contain nucleotide sequences.')
+            sys.exit()
 
-        genome_files = self._genome_files(options.genome_dir, options.genome_ext)
+        genome_files = self._genome_files(options.genome_nt_dir, options.genome_ext)
         if not self._check_nuclotide_seqs(genome_files):
             self.logger.warning('[Warning] All files must contain nucleotide sequences.')
             sys.exit()
 
-        taxonomic_profile = TaxonomicProfile(options.cpus, options.output_dir)
-        taxonomic_profile.run(genome_files,
-                                 options.db_file,
-                                 options.taxonomy_file,
-                                 options.evalue,
-                                 options.per_identity,
-                                 options.window_size,
-                                 options.step_size)
+        make_sure_path_exists(options.output_dir)
+
+        # get tetranucleotide signatures
+        if not options.tetra_file:
+            self.logger.info('')
+            tetra = Tetranucleotide(options.cpus)
+            tetra_file = os.path.join(options.output_dir, 'tetra.tsv')
+            signatures = tetra.run(options.scaffold_file)
+            tetra.write(signatures, tetra_file)
+            self.logger.info('  Tetranucleotide signatures written to: %s' % tetra_file)
+        else:
+            tetra_file = options.tetra_file
+
+        # get coverage information
+        if not options.coverage_file:
+            if not options.bam_files:
+                self.logger.warning('[Warning] One or more BAM files must be specified in order to calculate coverage profiles.')
+                sys.exit()
+
+            coverage = Coverage(options.cpus)
+            coverage_file = os.path.join(options.output_dir, 'coverage.tsv')
+            coverage.run(options.bam_files, coverage_file, options.cov_all_reads, options.cov_min_align, options.cov_max_edit_dist)
+            self.logger.info('')
+            self.logger.info('  Coverage profiles written to: %s' % coverage_file)
+        else:
+            coverage_file = options.coverage_file
+
+        # write out scaffold statistics
+        stats_output = os.path.join(options.output_dir, 'scaffold_stats.tsv')
+        stats = ScaffoldStats(options.cpus)
+        stats.run(options.scaffold_file, genome_files, tetra_file, coverage_file, stats_output)
+
+        self.logger.info('  Scaffold statistic written to: %s' % stats_output)
+
+        self.time_keeper.print_time_stamp()
+
+    def genome_stats(self, options):
+        """Genomes statistics command"""
+        self.logger.info('')
+        self.logger.info('*******************************************************************************')
+        self.logger.info(' [RefineM - genome_stats] Calculating statistics for genomes.')
+        self.logger.info('*******************************************************************************')
+
+        check_file_exists(options.scaffold_stats_file)
 
         self.logger.info('')
-        self.logger.info('  Results written to: %s' % options.output_dir)
+        self.logger.info('  Reading scaffold statistics.')
+        scaffold_stats = ScaffoldStats(options.cpus)
+        scaffold_stats.read(options.scaffold_stats_file)
+
+        genome_stats = GenomeStats()
+        genome_stats.run(scaffold_stats)
+        genome_stats.write(options.output_file)
+
+        self.logger.info('  Genome statistic written to: %s' % options.output_file)
 
         self.time_keeper.print_time_stamp()
 
@@ -144,63 +216,159 @@ class OptionsParser():
         self.logger.info('*******************************************************************************')
         self.logger.info(' [RefineM - gene_profile] Generating taxonomic profiles from genes.')
         self.logger.info('*******************************************************************************')
-        self.logger.info('')
 
         make_sure_path_exists(options.output_dir)
+        check_file_exists(options.scaffold_stats_file)
         check_file_exists(options.taxonomy_file)
         check_file_exists(options.db_file)
 
-        genome_files = self._genome_files(options.genome_dir, options.genome_ext)
-        if not self._check_nuclotide_seqs(genome_files):
-            self.logger.warning('[Warning] All files must contain nucleotide sequences.')
+        gene_files = self._genome_files(options.genome_prot_dir, options.protein_ext)
+        if not self._check_protein_seqs(gene_files):
+            self.logger.warning('[Warning] All files must contain amino acid sequences.')
             sys.exit()
-
-        # call genes for each genome
-        prodigal = Prodigal(options.cpus)
-        gene_dir = os.path.join(options.output_dir, 'genes')
-        make_sure_path_exists(gene_dir)
-        prodigal.run(genome_files, False, None, False, gene_dir)
-
-        # modify gene ids to include genome ids in order to ensure
-        # all gene identifiers are unique across the set of genomes,
-        # also removes the trailing asterisk used to identify the stop
-        # codon
-        self.logger.info('')
-        self.logger.info('  Appending genome identifiers to all gene identifiers.')
-        aa_gene_files = []
-        for gf in genome_files:
-            genome_id = remove_extension(gf)
-
-            nt_file = os.path.join(gene_dir, genome_id + '.genes.fna')
-            seqs = seq_io.read(nt_file)
-            fout = open(nt_file, 'w')
-            for seq_id, seq in seqs.iteritems():
-                fout.write('>' + seq_id + '~' + genome_id + '\n')
-                fout.write(seq + '\n')
-            fout.close()
-
-            aa_file = os.path.join(gene_dir, genome_id + '.genes.faa')
-            seqs = seq_io.read(aa_file)
-            fout = open(aa_file, 'w')
-            for seq_id, seq in seqs.iteritems():
-                fout.write('>' + seq_id + '~' + genome_id + '\n')
-                if seq[-1] == '*':
-                    seq = seq[0:-1]
-                fout.write(seq + '\n')
-            fout.close()
-
-            aa_gene_files.append(aa_file)
 
         # build gene profile
         gene_profile = GeneProfile(options.cpus, options.output_dir)
-        gene_profile.run(aa_gene_files,
-                             options.db_file,
-                             options.taxonomy_file,
-                             options.evalue,
-                             options.per_identity)
+        gene_profile.run(gene_files,
+                            options.scaffold_stats_file,
+                            options.db_file,
+                            options.taxonomy_file,
+                            options.per_to_classify,
+                            options.evalue,
+                            options.per_identity)
 
         self.logger.info('')
         self.logger.info('  Results written to: %s' % options.output_dir)
+
+        self.time_keeper.print_time_stamp()
+
+    def outliers(self, options):
+        """Outlier command"""
+        self.logger.info('')
+        self.logger.info('*******************************************************************************')
+        self.logger.info(' [RefineM - outliers] Identifying scaffolds with divergent characteristics.')
+        self.logger.info('*******************************************************************************')
+
+        check_file_exists(options.scaffold_stats_file)
+        make_sure_path_exists(options.output_dir)
+
+        self.logger.info('')
+        self.logger.info('  Reading scaffold statistics.')
+        scaffold_stats = ScaffoldStats()
+        scaffold_stats.read(options.scaffold_stats_file)
+
+        genome_stats = GenomeStats()
+        genome_stats = genome_stats.run(scaffold_stats)
+
+        # identify outliers
+        outliers = Outliers()
+        outlier_file = os.path.join(options.output_dir, 'outliers.tsv')
+        outliers.identify(scaffold_stats, genome_stats,
+                                      options.gc_perc, options.td_perc,
+                                      options.cov_corr, options.cov_perc,
+                                      options.report_type, outlier_file)
+        self.logger.info('  Outlier information written to: ' + outlier_file)
+
+        # create outlier plots
+        self.logger.info('')
+
+        highlight_scaffolds_ids = {}
+        if options.highlight_file:
+            highlight_scaffolds_ids = {line.split('\t')[0].strip() for line in open(options.highlight_file)}
+
+        genomes_processed = 0
+        plot_dir = os.path.join(options.output_dir, 'plots')
+        make_sure_path_exists(plot_dir)
+        for genome_id, gs in genome_stats.iteritems():
+            genomes_processed += 1
+
+            sys.stdout.write('  Plotting scaffold distribution for %d of %d (%.1f%%) genomes.\r' %
+                                                                                            (genomes_processed,
+                                                                                             len(genome_stats),
+                                                                                             genomes_processed * 100.0 / len(genome_stats)))
+            sys.stdout.flush()
+
+            genome_scaffold_stats = {}
+            for scaffold_id in scaffold_stats.scaffolds_in_genome[genome_id]:
+                genome_scaffold_stats[scaffold_id] = scaffold_stats.stats[scaffold_id]
+
+            if options.individual_plots:
+                # GC plot
+                gc_plots = GcPlots(options)
+                gc_plots.plot(genome_scaffold_stats, highlight_scaffolds_ids, gs.mean_gc, outliers.gc_dist, [options.gc_perc])
+
+                output_plot = os.path.join(plot_dir, genome_id + '.gc_plots.' + options.image_type)
+                gc_plots.save_plot(output_plot, dpi=options.dpi)
+                gc_plots.save_html(os.path.join(plot_dir, genome_id + '.gc_plots.html'))
+
+                # TD plot
+                td_plots = TdPlots(options)
+                td_plots.plot(genome_scaffold_stats, highlight_scaffolds_ids, gs.mean_signature, outliers.td_dist, [options.td_perc])
+
+                output_plot = os.path.join(plot_dir, genome_id + '.td_plots.' + options.image_type)
+                td_plots.save_plot(output_plot, dpi=options.dpi)
+                td_plots.save_html(os.path.join(plot_dir, genome_id + '.td_plots.html'))
+
+                # mean absolute deviation of coverage profiles
+                cov_perc_plots = CovPercPlots(options)
+                cov_perc_plots.plot(genome_scaffold_stats, highlight_scaffolds_ids, gs.mean_coverage, [options.cov_perc])
+
+                output_plot = os.path.join(plot_dir, genome_id + '.cov_perc.' + options.image_type)
+                cov_perc_plots.save_plot(output_plot, dpi=options.dpi)
+                cov_perc_plots.save_html(os.path.join(plot_dir, genome_id + '.cov_perc.html'))
+
+                # coverage correlation plots
+                if len(gs.mean_coverage) > 1:
+                    cov_corr_plots = CovCorrPlots(options)
+                    cov_corr_plots.plot(genome_scaffold_stats, highlight_scaffolds_ids, gs.mean_coverage, [options.cov_corr])
+
+                    output_plot = os.path.join(plot_dir, genome_id + '.cov_corr.' + options.image_type)
+                    cov_corr_plots.save_plot(output_plot, dpi=options.dpi)
+                    cov_corr_plots.save_html(os.path.join(plot_dir, genome_id + '.cov_corr.html'))
+
+            # combined plot of distributions
+            dist_plots = DistributionPlots(options)
+            dist_plots.plot(genome_scaffold_stats,
+                            highlight_scaffolds_ids, gs,
+                            outliers.gc_dist, outliers.td_dist,
+                            options.gc_perc, options.td_perc, options.cov_perc)
+
+            output_plot = os.path.join(plot_dir, genome_id + '.dist_plot.' + options.image_type)
+            dist_plots.save_plot(output_plot, dpi=options.dpi)
+            dist_plots.save_html(os.path.join(plot_dir, genome_id + '.dist_plot.html'))
+
+        sys.stdout.write('\n')
+
+        self.logger.info('  Outlier plots written to: ' + plot_dir)
+
+        self.time_keeper.print_time_stamp()
+
+    def reference(self, options):
+        """Reference command"""
+        self.logger.info('')
+        self.logger.info('*******************************************************************************')
+        self.logger.info('[RefineM - reference] Identifying scaffolds similar to specific genome(s).')
+        self.logger.info('*******************************************************************************')
+
+        check_file_exists(options.scaffold_prot_file)
+        check_file_exists(options.scaffold_stats_file)
+        make_sure_path_exists(options.output_dir)
+
+        ref_gene_files = self._genome_files(options.ref_genome_prot_dir, options.protein_ext)
+        if not self._check_protein_seqs(ref_gene_files):
+            self.logger.warning('[Warning] All files must contain amino acid sequences.')
+            sys.exit()
+
+        reference = Reference(options.cpus, options.output_dir)
+        reference_out = reference.run(options.scaffold_prot_file,
+                                        options.scaffold_stats_file,
+                                        ref_gene_files,
+                                        options.db_file,
+                                        options.evalue,
+                                        options.per_identity)
+
+        self.logger.info('')
+        self.logger.info('  Results written to: ' + reference_out)
 
         self.time_keeper.print_time_stamp()
 
@@ -210,7 +378,6 @@ class OptionsParser():
         self.logger.info('*******************************************************************************')
         self.logger.info(' [RefineM - modify] Modifying scaffolds in genome.')
         self.logger.info('*******************************************************************************')
-        self.logger.info('')
 
         make_sure_path_exists(os.path.dirname(options.output_genome))
 
@@ -222,6 +389,8 @@ class OptionsParser():
             self.logger.warning("  [Warning] The 'outlier_file' option cannot be specified with 'add' or 'remove'.\n")
             sys.exit()
 
+        failed_to_add = []
+        failed_to_remove = []
         if options.add or options.remove:
             failed_to_add, failed_to_remove = genome_tk.modify(options.genome_file,
                                                                options.scaffold_file,
@@ -229,9 +398,8 @@ class OptionsParser():
                                                                options.remove,
                                                                options.output_genome)
         elif options.outlier_file:
-            # **** TO DO!
-            # binTools.removeOutliers(options.genome_file, options.outlier_file, options.output_file)
-            pass
+            outliers = Outliers()
+            outliers.remove(options.genome_file, options.outlier_file, options.output_genome)
 
         if failed_to_add:
             self.logger.warning('  [Warning] Failed to add the following sequence(s):')
@@ -244,7 +412,7 @@ class OptionsParser():
                 self.logger.warning('    %s' % seq_id)
 
         self.logger.info('')
-        self.logger.info('  Modified genome written to: ' + options.output_file)
+        self.logger.info('  Modified genome written to: ' + options.output_genome)
 
         self.time_keeper.print_time_stamp()
 
@@ -254,20 +422,25 @@ class OptionsParser():
         self.logger.info('*******************************************************************************')
         self.logger.info(' [RefineM - call_genes] Identifying genes within genomes.')
         self.logger.info('*******************************************************************************')
-        self.logger.info('')
 
+        check_dir_exists(options.genome_nt_dir)
         make_sure_path_exists(options.output_dir)
 
-        genome_files = self._genome_files(options.genome_dir, options.genome_ext)
+        genome_files = self._genome_files(options.genome_nt_dir, options.genome_ext)
         if not self._check_nuclotide_seqs(genome_files):
             self.logger.warning('[Warning] All files must contain nucleotide sequences.')
             sys.exit()
 
-        prodigal = Prodigal(options.cpus, options.genes, options.output_dir)
-        prodigal.run(genome_files)
+        # call genes in genomes
+        prodigal = Prodigal(options.cpus)
+        prodigal.run(genome_files, False, None, False, options.output_dir)
+        self.logger.info('  Genes in genomes written to: %s' % options.output_dir)
 
-        self.logger.info('')
-        self.logger.info('  Identified genes written to: %s' % options.output_dir)
+        # call genes in unbinned scaffolds
+        if options.unbinned_file:
+            unbinned_output_dir = os.path.join(options.output_dir, 'unbinned')
+            prodigal.run([options.unbinned_file], False, 11, True, unbinned_output_dir)
+            self.logger.info('  Genes in unbinned scaffolds written to: %s' % unbinned_output_dir)
 
         self.time_keeper.print_time_stamp()
 
@@ -277,12 +450,15 @@ class OptionsParser():
         self.logger.info('*******************************************************************************')
         self.logger.info('[RefineM - unique] Ensuring sequences are assigned to a single genome.')
         self.logger.info('*******************************************************************************')
-        self.logger.info('')
 
-        genome_files = self._genome_files(options.genome_dir, options.genome_ext)
+        genome_files = self._genome_files(options.genome_nt_dir, options.genome_ext)
+        if not self._check_nuclotide_seqs(genome_files):
+            self.logger.warning('[Warning] All files must contain nucleotide sequences.')
+            sys.exit()
 
         duplicates = genome_tk.unique(genome_files)
 
+        self.logger.info('')
         if len(duplicates) == 0:
             self.logger.info('  Pass: All sequences were identified exactly once.')
         else:
@@ -316,13 +492,19 @@ class OptionsParser():
         self.logger.info('*******************************************************************************')
         self.logger.info('[RefineM - bin_compare] Comparing two sets of genomes.')
         self.logger.info('*******************************************************************************')
-        self.logger.info('')
 
-        check_dir_exists(options.genomes_dir1)
-        check_dir_exists(options.genomes_dir2)
+        check_dir_exists(options.genome_nt_dir1)
+        check_dir_exists(options.genome_nt_dir2)
 
-        genomes_files1 = self._genome_files(options.genomes_dir1, options.genome_ext1)
-        genomes_files2 = self._genome_files(options.genomes_dir2, options.genome_ext2)
+        genomes_files1 = self._genome_files(options.genome_nt_dir1, options.genome_ext1)
+        if not self._check_nuclotide_seqs(genomes_files1):
+            self.logger.warning('[Warning] All files must contain nucleotide sequences.')
+            sys.exit()
+
+        genomes_files2 = self._genome_files(options.genome_nt_dir2, options.genome_ext2)
+        if not self._check_nuclotide_seqs(genomes_files2):
+            self.logger.warning('[Warning] All files must contain nucleotide sequences.')
+            sys.exit()
 
         bin_comparer = BinComparer()
         bin_comparer.run(genomes_files1, genomes_files2, options.scaffold_file, options.output_file)
@@ -332,66 +514,19 @@ class OptionsParser():
 
         self.time_keeper.print_time_stamp()
 
-    def reference(self, options):
-        """Reference command"""
-        self.logger.info('')
-        self.logger.info('*******************************************************************************')
-        self.logger.info('[RefineM - reference] Identifying scaffolds similar to specific genome(s).')
-        self.logger.info('*******************************************************************************')
-        self.logger.info('')
-
-        # call genes on scaffold file
-        prodigal = Prodigal(options.cpus)
-        scaffold_genes_dir = os.path.join(options.output_dir, 'scaffold_genes')
-        make_sure_path_exists(scaffold_genes_dir)
-        prodigal.run([options.scaffold_file], False, 11, True, scaffold_genes_dir)
-        scaffold_gene_file = os.path.join(scaffold_genes_dir, remove_extension(options.scaffold_file) + '.genes.faa')
-
-        # call genes on reference genomes
-        self.logger.info('')
-        genome_files = self._genome_files(options.ref_genome_dir, options.genome_ext)
-        ref_genome_genes_dir = os.path.join(options.output_dir, 'ref_genome_genes')
-        make_sure_path_exists(ref_genome_genes_dir)
-        prodigal.run(genome_files, False, None, False, ref_genome_genes_dir)
-
-        ref_genome_gene_files = []
-        for f in genome_files:
-            ref_genome_gene_files.append(os.path.join(ref_genome_genes_dir, remove_extension(f) + '.genes.faa'))
-
-        # get binned genomes
-        binned_genomes = self._genome_files(options.ref_genome_dir, options.genome_ext)
-        scaffold_id_bin_id = {}
-        for g in binned_genomes:
-            bin_id = remove_extension(g)
-            for seq_id, _seq in seq_io.read_seq(g):
-                #*** This is a bit questionable, but does make RefineM compatible with FinishM
-                for contig_id in seq_id.split(':'):
-                    scaffold_id_bin_id[contig_id] = bin_id
-                scaffold_id_bin_id[seq_id] = bin_id
-
-        reference = Reference(options.cpus, options.output_dir)
-        reference_out = reference.run(options.scaffold_file,
-                                        scaffold_gene_file,
-                                        ref_genome_gene_files,
-                                        options.db_file, options.coverage,
-                                        options.evalue, options.per_identity, scaffold_id_bin_id)
-
-        self.logger.info('')
-        self.logger.info('  Results written to: ' + reference_out)
-
-        self.time_keeper.print_time_stamp()
-
     def unbinned(self, options):
         """Unbinned Command"""
         self.logger.info('')
         self.logger.info('*******************************************************************************')
         self.logger.info(' [RefineM - unbinned] Identify unbinned scaffolds.')
         self.logger.info('*******************************************************************************')
-        self.logger.info('')
 
-        check_dir_exists(options.genome_dir)
+        check_dir_exists(options.genome_nt_dir)
 
-        genomes_files = self._genome_files(options.genome_dir, options.genome_ext)
+        genomes_files = self._genome_files(options.genome_nt_dir, options.genome_ext)
+        if not self._check_nuclotide_seqs(genomes_files):
+            self.logger.warning('[Warning] All files must contain nucleotide sequences.')
+            sys.exit()
 
         unbinned = Unbinned()
         unbinned_seqs = unbinned.run(genomes_files, options.scaffold_file, options.min_seq_len)
@@ -403,97 +538,33 @@ class OptionsParser():
 
         self.time_keeper.print_time_stamp()
 
-    def coverage(self, options):
-        """Coverage command"""
-        self.logger.info('')
-        self.logger.info('*******************************************************************************')
-        self.logger.info(' [RefineM - coverage] Calculating coverage of scaffolds.')
-        self.logger.info('*******************************************************************************')
-        self.logger.info('')
-
-        genome_files = self._genome_files(options.genome_dir, options.genome_ext)
-
-        coverage = Coverage(options.cpus)
-        coverage.run(genome_files, options.bam_files, options.output_file, options.all_reads, options.min_align, options.max_edit_dist)
-
-        self.logger.info('')
-        self.logger.info('  Coverage information written to: ' + options.output_file)
-
-        self.time_keeper.print_time_stamp()
-
-    def tetra(self, options):
-        """Tetra usage command"""
-        self.logger.info('')
-        self.logger.info('*******************************************************************************')
-        self.logger.info(' [RefineM - tetra] Calculating tetranucleotide signature of scaffolds.')
-        self.logger.info('*******************************************************************************')
-        self.logger.info('')
-
-        # determine sequences in each genome
-        genome_files = self._genome_files(options.genome_dir, options.genome_ext)
-
-        bin_id_scaffold_id = {}
-        for genome_file in genome_files:
-            bin_id = remove_extension(genome_file)
-            for seq_id, _seq in seq_io.read_seq(genome_file):
-                bin_id_scaffold_id[seq_id] = bin_id
-
-        # calculate tetranucleotide signatures
-        tetra = Tetranucleotide(options.cpus)
-        seq_signatures = tetra.run(options.scaffold_file)
-
-        # write results
-        fout = open(options.output_file, 'w')
-
-        fout.write('Scaffold id\tBin id')
-        for kmer in tetra.canonical_order():
-            fout.write('\t' + kmer)
-        fout.write('\n')
-
-        for seq_id, tetra_signature in seq_signatures.iteritems():
-            fout.write(seq_id + '\t' + bin_id_scaffold_id.get(seq_id, 'unbinned'))
-            fout.write('\t' + '\t'.join(map(str, tetra_signature)))
-            fout.write('\n')
-
-        fout.close()
-
-        self.logger.info('')
-        self.logger.info('  Tetranucleotide signatures written to: %s' % options.output_file)
-
-        self.time_keeper.print_time_stamp()
-
     def parse_options(self, options):
         """Parse user options and call the correct pipeline(s)"""
-        try:
-            if options.bVerbose:
-                logging.basicConfig(format='', level=logging.DEBUG)
-            elif options.bQuiet:
-                logging.basicConfig(format='', level=logging.ERROR)
-            else:
-                logging.basicConfig(format='', level=logging.INFO)
-        except:
-            logging.basicConfig(format='', level=logging.INFO)
 
-        check_dependencies(('prodigal', 'diamond', 'ktImportText'))
+        logging.basicConfig(format='', level=logging.INFO)
 
-        if(options.subparser_name == 'taxa_profile'):
-            self.taxa_profile(options)
+        check_dependencies(('diamond', 'ktImportText'))
+
+        if(options.subparser_name == 'scaffold_stats'):
+            self.scaffold_stats(options)
+        elif(options.subparser_name == 'genome_stats'):
+            self.genome_stats(options)
         elif(options.subparser_name == 'gene_profile'):
             self.gene_profile(options)
+        elif(options.subparser_name == 'outliers'):
+            self.outliers(options)
+        elif(options.subparser_name == 'reference'):
+            self.reference(options)
         elif(options.subparser_name == 'unique'):
             self.unique(options)
         elif(options.subparser_name == 'bin_compare'):
             self.bin_compare(options)
-        elif(options.subparser_name == 'reference'):
-            self.reference(options)
+        elif(options.subparser_name == 'modify'):
+            self.modify(options)
         elif(options.subparser_name == 'call_genes'):
             self.call_genes(options)
         elif(options.subparser_name == 'unbinned'):
             self.unbinned(options)
-        elif(options.subparser_name == 'coverage'):
-            self.coverage(options)
-        elif(options.subparser_name == 'tetra'):
-            self.tetra(options)
         else:
             self.logger.error('  [Error] Unknown RefineM command: ' + options.subparser_name + '\n')
             sys.exit()

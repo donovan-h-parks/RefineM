@@ -24,7 +24,6 @@ import logging
 from biolib.common import check_file_exists
 
 import biolib.seq_io as seq_io
-import biolib.seq_tk as seq_tk
 
 
 class Unbinned():
@@ -55,6 +54,7 @@ class Unbinned():
         check_file_exists(scaffold_file)
 
         # get list of sequences in bins
+        self.logger.info('')
         self.logger.info('  Reading binned scaffolds.')
 
         binned_seq_ids = set()

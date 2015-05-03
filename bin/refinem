@@ -60,32 +60,31 @@ def print_help():
     print '                ...::: RefineM v' + version() + ' :::...'''
     print '''\
 
+    Scaffold statistics:
+     scaffold_stats -> Calculate statistics for scaffolds
+     genome_stats   -> Calculate statistics for genomes
+
     Reduce contamination:
-     taxa_profile -> Generate a taxonomic profile of scaffolds within a genome
-     gene_profile -> Generate taxonomic profile of genes across scaffolds within a genome
-     outliers     -> [not implemented] Identify scaffolds with divergent GC, coverage, or tetranucleotide signatures
-     euk_origin   -> [not implemented] Identify scaffolds with a coding density suggestive of a Eukaryotic origin
+     gene_profile   -> Generate a taxonomic profile from the genes within a genome
+     outliers       -> Identify scaffolds with divergent GC, coverage, or tetranucleotide signatures
+     euk_origin     -> [not implemented] Identify scaffolds with a coding density suggestive of a Eukaryotic origin
 
     Improve completeness:
-     reference    -> Identify scaffolds with similarity to specific reference genome(s)
-     compatible   -> [not implemented] Identify scaffolds with compatible GC, coverage, and tetranucleotide signatures
-     merge        -> [not implemented] Identify partial genomes which should be merged together (requires CheckM)
+     reference      -> Identify scaffolds with similarity to specific reference genome(s)
+     compatible     -> [not implemented] Identify scaffolds with compatible GC, coverage, and tetranucleotide signatures
+     merge          -> [not implemented] Identify partial genomes which should be merged together (requires CheckM)
 
     Modify genome:
-     modify       -> Modify scaffolds in a genome
+     modify         -> Modify scaffolds in a genome
 
     Genome validation and exploration:
-     unique       -> Ensure sequences are assigned to a single genome
-     unbinned     -> Identify unbinned scaffolds
-     bin_compare  -> Compare two sets of bins/genomes (e.g., from alternative binning methods)
-     bin_union    -> [not implemented] Merge multiple binning efforts into a single bin set
-
-    Scaffold statistics:
-     coverage     -> Calculate coverage of sequences
-     tetra        -> Calculate tetranucleotide signature of sequences
+     unique         -> Ensure scaffolds are assigned to a single genome
+     unbinned       -> Identify unbinned scaffolds
+     bin_compare    -> Compare two sets of genomes (e.g., from alternative binning methods)
+     bin_union      -> [not implemented] Merge multiple binning efforts into a single bin set
 
     Utility functions:
-     call_genes   -> Identify genes within genomes
+     call_genes     -> Identify genes within genomes
 
   Use: refinem <command> -h for command specific help.
 
@@ -99,35 +98,82 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(add_help=False)
     subparsers = parser.add_subparsers(help="--", dest='subparser_name')
 
-    # taxonomically classify scaffolds
-    taxa_profile_parser = subparsers.add_parser('taxa_profile',
-                                        formatter_class=CustomHelpFormatter,
-                                        description='Generate a taxonomic profile of scaffolds within a genome.')
-    taxa_profile_parser.add_argument('genome_dir', help="directory containing genomes")
-    taxa_profile_parser.add_argument('db_file', help="database of reference genomes")
-    taxa_profile_parser.add_argument('taxonomy_file', help="taxonomic assignment of each reference genomes")
-    taxa_profile_parser.add_argument('output_dir', help="output directory")
-    taxa_profile_parser.add_argument('-e', '--evalue', type=float, default=1e-3, help="e-value of valid hits")
-    taxa_profile_parser.add_argument('-p', '--per_identity', type=float, default=30.0, help="percent identity of valid hits")
-    taxa_profile_parser.add_argument('-w', '--window_size', type=int, default=500, help="size of fragments to classify")
-    taxa_profile_parser.add_argument('-s', '--step_size', type=int, default=500, help="base pairs to shift between fragments")
-    taxa_profile_parser.add_argument('-x', '--genome_ext', default='fna', help="extension of genomes (other files in directory are ignored)")
-    taxa_profile_parser.add_argument('--tmpdir', action=ChangeTempAction, default=tempfile.gettempdir(), help="specify alternative directory for temporary files")
-    taxa_profile_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
+    # Calculate scaffold statistics
+    stats_parser = subparsers.add_parser('scaffold_stats',
+                                            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                            description='Calculate statistics for scaffolds')
+
+    stats_parser.add_argument('scaffold_file', help="scaffolds binned to generate putative genomes")
+    stats_parser.add_argument('genome_nt_dir', help="directory containing nucleotide scaffolds for each genome")
+    stats_parser.add_argument('output_dir', help="output directory")
+    stats_parser.add_argument('bam_files', nargs='*', help="BAM files to parse for coverage profile")
+    stats_parser.add_argument('-x', '--genome_ext', default='fna', help="extension of genomes (other files in directory are ignored)")
+    stats_parser.add_argument('--tetra_file', help="file containing tetranucleotide signatures information", default=None)
+    stats_parser.add_argument('--coverage_file', help="file containing coverage profile information", default=None)
+    stats_parser.add_argument('-r', '--cov_all_reads', action='store_true', help="use all reads to estimate coverage instead of just proper pairs")
+    stats_parser.add_argument('-a', '--cov_min_align', help='minimum alignment length as percentage of read length', type=float, default=0.98)
+    stats_parser.add_argument('-e', '--cov_max_edit_dist', help='maximum edit distance as percentage of read length', type=float, default=0.02)
+    stats_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
+
+    # Calculate genome statistics
+    genome_stats_parser = subparsers.add_parser('genome_stats',
+                                            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                            description='Calculate statistics for genomes')
+
+    genome_stats_parser.add_argument('scaffold_stats_file', help="file with statistics for each scaffold")
+    genome_stats_parser.add_argument('output_file', help="output file with genome statistics")
+    genome_stats_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
 
     # taxonomically classify genes within genome
     gene_profile_parser = subparsers.add_parser('gene_profile',
                                         formatter_class=CustomHelpFormatter,
                                         description='Generate taxonomic profile of genes across scaffolds within a genome.')
-    gene_profile_parser.add_argument('genome_dir', help="directory containing genomes")
+    gene_profile_parser.add_argument('genome_prot_dir', help="directory containing  amino acid genes for each genome")
+    gene_profile_parser.add_argument('scaffold_stats_file', help="file with statistics for each scaffold")
     gene_profile_parser.add_argument('db_file', help="database of reference genomes")
     gene_profile_parser.add_argument('taxonomy_file', help="taxonomic assignment of each reference genomes")
     gene_profile_parser.add_argument('output_dir', help="output directory")
+    gene_profile_parser.add_argument('-p', '--per_to_classify', type=float, default=20.0, help='minimum percentage of genes to assign a scaffold to a taxonomic group')
     gene_profile_parser.add_argument('-e', '--evalue', type=float, default=1e-3, help="e-value of valid hits")
-    gene_profile_parser.add_argument('-p', '--per_identity', type=float, default=30.0, help="percent identity of valid hits")
-    gene_profile_parser.add_argument('-x', '--genome_ext', default='fna', help="extension of genomes (other files in directory are ignored)")
+    gene_profile_parser.add_argument('-i', '--per_identity', type=float, default=30.0, help="percent identity of valid hits")
+    gene_profile_parser.add_argument('-x', '--protein_ext', default='faa', help="extension of amino acid gene files (other files in directory are ignored)")
     gene_profile_parser.add_argument('--tmpdir', action=ChangeTempAction, default=tempfile.gettempdir(), help="specify alternative directory for temporary files")
     gene_profile_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
+
+    # Identify outlier sequences
+    outlier_parser = subparsers.add_parser('outliers',
+                                            formatter_class=CustomHelpFormatter,
+                                            description='Identify scaffolds with divergent genomic characteristics')
+    outlier_parser.add_argument('scaffold_stats_file', help="file with statistics for each scaffold")
+    outlier_parser.add_argument('output_dir', help="output directory")
+    outlier_parser.add_argument('--gc_perc', help='percentile for identify scaffolds with divergent GC content', type=int, choices=xrange(0, 101), default=95, metavar='int')
+    outlier_parser.add_argument('--td_perc', help='percentile for identify scaffolds with divergent tetranucleotide signatures', type=int, choices=xrange(0, 101), default=95, metavar='int')
+    outlier_parser.add_argument('--cov_corr', help='correlation for identifying scaffolds with divergent coverage profiles', type=float, default=0.8)
+    outlier_parser.add_argument('--cov_perc', help='mean percent deviation for identifying scaffolds with divergent coverage profiles', type=int, choices=xrange(0, 301), default=50, metavar='int')
+    outlier_parser.add_argument('-r', '--report_type', help="report sequences that are outliers in 'all' or 'any' reference distribution", choices=['any', 'all'], default='any')
+    outlier_parser.add_argument('--individual_plots', action="store_true", default=False, help='create individual plots for each statistic')
+    outlier_parser.add_argument('--image_type', default='png', choices=['eps', 'pdf', 'png', 'ps', 'svg'], help='desired image type')
+    outlier_parser.add_argument('--point_size', type=int, default=10, help='desired size of points in scatterplot')
+    outlier_parser.add_argument('--highlight_file', help='file indicating scaffolds to highlight')
+    outlier_parser.add_argument('--dpi', type=int, default=600, help='desired DPI of output image')
+    outlier_parser.add_argument('--font_size', type=int, default=8, help='desired font size')
+    outlier_parser.add_argument('--width', type=float, default=6.5, help='width of output image')
+    outlier_parser.add_argument('--height', type=float, default=3.5, help='height of output image')
+
+    # identify scaffolds with similarity to a set of reference genomes
+    reference_parser = subparsers.add_parser('reference',
+                                        formatter_class=CustomHelpFormatter,
+                                        description='Identify scaffolds with similarity to specific reference genome(s).')
+    reference_parser.add_argument('scaffold_prot_file', help="amino acid genes from scaffolds of interest")
+    reference_parser.add_argument('scaffold_stats_file', help="file with statistics for each scaffold")
+    reference_parser.add_argument('ref_genome_prot_dir', help="directory containing amino acid genes for reference genomes")
+    reference_parser.add_argument('db_file', help="database of competing reference genomes")
+    reference_parser.add_argument('output_dir', help="output directory")
+    reference_parser.add_argument('-e', '--evalue', type=float, default=1e-3, help="e-value of valid hits")
+    reference_parser.add_argument('-i', '--per_identity', type=float, default=30.0, help="percent identity of valid hits")
+    reference_parser.add_argument('-x', '--protein_ext', default='faa', help="extension of amino acid gene files (other files in directory are ignored)")
+    reference_parser.add_argument('--tmpdir', action=ChangeTempAction, default=tempfile.gettempdir(), help="specify alternative directory for temporary files")
+    reference_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
 
     # Modify a bin
     modify_parser = subparsers.add_parser('modify',
@@ -140,11 +186,11 @@ if __name__ == '__main__':
     modify_parser.add_argument('-r', '--remove', action='append', help="ID of scaffold to remove from bin (may specify multiple times)")
     modify_parser.add_argument('-o', '--outlier_file', help="remove all scaffolds identified as outliers (see outlier command)")
 
-    # Ensure sequences are assigned to a single bin
+    # Ensure scaffolds are assigned to a single bin
     unique_parser = subparsers.add_parser('unique',
                                             formatter_class=CustomHelpFormatter,
-                                            description='Ensure sequences are assigned to a single genome.')
-    unique_parser.add_argument('genome_dir', help="directory containing genomes")
+                                            description='Ensure scaffolds are assigned to a single genome.')
+    unique_parser.add_argument('genome_nt_dir', help="directory containing nucleotide scaffolds for each genome")
     unique_parser.add_argument('-x', '--genome_ext', default='fna', help="extension of genomes (other files in directory are ignored)")
 
     # Compare two sets of bins (e.g., from alternative binning methods)
@@ -152,73 +198,32 @@ if __name__ == '__main__':
                                                formatter_class=CustomHelpFormatter,
                                                description='Compare two sets of bins.')
     bin_compare_parser.add_argument('scaffold_file', help="scaffolds binned to generate putative genomes")
-    bin_compare_parser.add_argument('genomes_dir1', help="directory containing genomes")
-    bin_compare_parser.add_argument('genomes_dir2', help="directory containing genomes")
+    bin_compare_parser.add_argument('genome_nt_dir1', help="directory containing nucleotide scaffolds for each genome")
+    bin_compare_parser.add_argument('genome_nt_dir2', help="directory containing nucleotide scaffolds for each genome")
     bin_compare_parser.add_argument('output_file', help="output file indicating overlap between bins")
 
     bin_compare_parser.add_argument('-x', '--genome_ext1', default='fna', help="extension of genomes in directory 1")
     bin_compare_parser.add_argument('-y', '--genome_ext2', default='fna', help="extension of genomes in directory 2")
 
-    # identify scaffolds with similarity to a set of reference genomes
-    reference_parser = subparsers.add_parser('reference',
-                                        formatter_class=CustomHelpFormatter,
-                                        description='Identify scaffolds with similarity to specific reference genome(s).')
-    reference_parser.add_argument('scaffold_file', help="scaffolds to search")
-    reference_parser.add_argument('ref_genome_dir', help="directory containing reference genomes of interest")
-    reference_parser.add_argument('db_file', help="database of competing reference genomes")
-    reference_parser.add_argument('output_dir', help="output directory")
-    reference_parser.add_argument('-g', '--genome_dir', help="directory containing genomes binned from the specified scaffolds")
-    reference_parser.add_argument('--coverage', help="file containing coverage information for each scaffold")
-    reference_parser.add_argument('-e', '--evalue', type=float, default=1e-3, help="e-value of valid hits")
-    reference_parser.add_argument('-p', '--per_identity', type=float, default=30.0, help="percent identity of valid hits")
-    reference_parser.add_argument('-x', '--genome_ext', default='fna', help="extension of genomes (other files in directory are ignored)")
-    reference_parser.add_argument('--tmpdir', action=ChangeTempAction, default=tempfile.gettempdir(), help="specify alternative directory for temporary files")
-    reference_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
-
     # identify genes within genomes
     call_genes_parser = subparsers.add_parser('call_genes',
                                         formatter_class=CustomHelpFormatter,
                                         description='Identify genes within genomes.')
-    call_genes_parser.add_argument('genome_dir', help="directory containing genomes")
+    call_genes_parser.add_argument('genome_nt_dir', help="directory containing nucleotide scaffolds for each genome")
     call_genes_parser.add_argument('output_dir', help="output directory")
-    call_genes_parser.add_argument('-g', '--genes', action="store_true", default=False, help="files in genome directory contain genes as amino acids")
-    call_genes_parser.add_argument('--genome_ext', default='fna', help="extension of genomes (other files in directory are ignored)")
+    call_genes_parser.add_argument('-u', '--unbinned_file', help="call genes on unbinned scaffolds", default=None)
+    call_genes_parser.add_argument('-x', '--genome_ext', default='fna', help="extension of genomes (other files in directory are ignored)")
     call_genes_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
 
-    # identify unbinned sequences
+    # identify unbinned scaffolds
     unbinned_parser = subparsers.add_parser('unbinned',
                                             formatter_class=CustomHelpFormatter,
-                                            description='Identify unbinned sequences.')
-    unbinned_parser.add_argument('genome_dir', help="directory containing genomes")
+                                            description='Identify unbinned scaffolds.')
+    unbinned_parser.add_argument('genome_nt_dir', help="directory containing nucleotide scaffolds for each genome")
     unbinned_parser.add_argument('scaffold_file', help="scaffolds binned to generate putative genomes")
     unbinned_parser.add_argument('output_file', help="output file containing unbinned scaffolds")
     unbinned_parser.add_argument('-x', '--genome_ext', default='fna', help="extension of genomes (other files in directory are ignored)")
-    unbinned_parser.add_argument('-s', '--min_seq_len', type=int, default=0, help="ignore scaffolds shorter than the specified length")
-
-    # Calculate coverage
-    coverage_parser = subparsers.add_parser('coverage',
-                                            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                            description='Calculate coverage of sequences.',
-                                            epilog='Example: checkm coverage ./bins coverage.tsv example_1.bam example_2.bam')
-
-    coverage_parser.add_argument('genome_dir', help="directory containing genomes")
-    coverage_parser.add_argument('output_file', help="output file with coverage profiles")
-    coverage_parser.add_argument('bam_files', nargs='+', help="BAM files to parse")
-    coverage_parser.add_argument('--genome_ext', default='fna', help="extension of genomes (other files in directory are ignored)")
-    coverage_parser.add_argument('-r', '--all_reads', action='store_true', help="use all reads to estimate coverage instead of just those in proper pairs")
-    coverage_parser.add_argument('-a', '--min_align', help='minimum alignment length as percentage of read length', type=float, default = 0.98)
-    coverage_parser.add_argument('-e', '--max_edit_dist', help='maximum edit distance as percentage of read length', type=float, default = 0.02)
-    coverage_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
-
-    # calculate tetranucleotide signatures
-    tetra_parser = subparsers.add_parser('tetra',
-                                        formatter_class=CustomHelpFormatter,
-                                        description='Calculate tetranucleotide signature of scaffolds.')
-    tetra_parser.add_argument('genome_dir', help="directory containing genomes")
-    tetra_parser.add_argument('scaffold_file', help="scaffolds binned to generate putative genomes")
-    tetra_parser.add_argument('output_file', help="output file indicating tetranucleotide signatures")
-    tetra_parser.add_argument('--genome_ext', default='fna', help="extension of genomes (other files in directory are ignored)")
-    tetra_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
+    unbinned_parser.add_argument('-s', '--min_seq_len', type=int, default=1000, help="ignore scaffolds shorter than the specified length")
 
     # get and check options
     args = None

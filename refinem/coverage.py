@@ -24,14 +24,14 @@ import os
 import multiprocessing as mp
 import logging
 import ntpath
+import traceback
 from collections import defaultdict
 
 import pysam
 
-import biolib.seq_io as seq_io
 from biolib.common import remove_extension
 
-from numpy import mean, std
+from refinem.errors import ParsingError
 
 
 class ReadLoader:
@@ -64,9 +64,9 @@ class ReadLoader:
             self.num_secondary += 1
         elif read.is_qcfail:
             self.num_failed_qc += 1
-        elif read.alen < self.min_align_per*read.rlen:
+        elif read.alen < self.min_align_per * read.rlen:
             self.num_failed_align_len += 1
-        elif read.opt('NM') > self.max_edit_dist_per*read.rlen:
+        elif read.opt('NM') > self.max_edit_dist_per * read.rlen:
             self.num_failed_edit_dist += 1
         elif not self.all_reads and not read.is_proper_pair:
             self.num_failed_proper_pair += 1
@@ -79,6 +79,7 @@ class ReadLoader:
             # alignment length and edit distance thresholds are zero).
             self.coverage += read.alen
 
+
 class CoverageStruct():
     """Coverage information for scaffolds."""
 
@@ -86,6 +87,7 @@ class CoverageStruct():
         self.seq_len = seq_len
         self.mapped_reads = mapped_reads
         self.coverage = coverage
+
 
 class Coverage():
     """Calculate coverage of all sequences."""
@@ -95,20 +97,8 @@ class Coverage():
 
         self.cpus = cpus
 
-    def run(self, genome_files, bam_files, out_file, all_reads, min_align_per, max_edit_dist_per):
+    def run(self, bam_files, out_file, all_reads, min_align_per, max_edit_dist_per):
         """Calculate coverage of sequences for each BAM file."""
-
-        # determine genome assignment of each scaffold
-        self.logger.info('  Determining genome assignment of each scaffold.')
-
-        seq_id_genome_id = {}
-        for genome_file in genome_files:
-            genome_id = remove_extension(genome_file)
-            for seq_id, _seq in seq_io.read_seq(genome_file):
-                seq_id_genome_id[seq_id] = genome_id
-
-        # process each fasta file
-        self.logger.info("  Processing %d file(s) with %d cpus.\n" % (len(bam_files), self.cpus))
 
         # make sure all BAM files are sorted
         for bam_file in bam_files:
@@ -119,23 +109,24 @@ class Coverage():
         # calculate coverage of each BAM file
         coverage_info = {}
         for i, bam_file in enumerate(bam_files):
-            self.logger.info('  Processing %s (%d of %d):' % (ntpath.basename(bam_file), i+1, len(bam_files)))
+            self.logger.info('')
+            self.logger.info('  Calculating coverage profile for %s (%d of %d):' % (ntpath.basename(bam_file), i + 1, len(bam_files)))
 
             coverage_info[bam_file] = mp.Manager().dict()
             coverage_info[bam_file] = self._process_bam(bam_file, all_reads, min_align_per, max_edit_dist_per, coverage_info[bam_file])
 
         fout = open(out_file, 'w')
-        header = 'Scaffold Id\tGenome Id\tScaffold length (bp)'
-        for _ in bam_files:
-            header += '\tBam Id\tCoverage\tMapped reads'
-
+        header = 'Scaffold Id\tLength (bp)'
+        for bam_file in bam_files:
+            bam_id = remove_extension(bam_file)
+            header += '\t' + bam_id
         fout.write(header + '\n')
 
         for seq_id in coverage_info[coverage_info.keys()[0]].keys():
-            row_str = seq_id + '\t' + seq_id_genome_id.get(seq_id, 'unbinned') + '\t' + str(coverage_info[coverage_info.keys()[0]][seq_id].seq_len)
+            row_str = seq_id + '\t' + str(coverage_info[coverage_info.keys()[0]][seq_id].seq_len)
             for bam_file in bam_files:
                 bam_id = remove_extension(bam_file)
-                row_str += '\t' + bam_id + '\t' + str(coverage_info[bam_file][seq_id].coverage) + '\t' + str(coverage_info[bam_file][seq_id].mapped_reads)
+                row_str += '\t' + str(coverage_info[bam_file][seq_id].coverage)
             fout.write(row_str + '\n')
 
         fout.close()
@@ -179,8 +170,8 @@ class Coverage():
             worker_queue.put((None, None))
 
         try:
-            worker_proc = [mp.Process(target = self._worker, args = (bam_file, all_reads, min_align_per, max_edit_dist_per, worker_queue, writer_queue)) for _ in range(self.cpus)]
-            write_proc = mp.Process(target = self._writer, args = (coverage_info, len(ref_seq_ids), writer_queue))
+            worker_proc = [mp.Process(target=self._worker, args=(bam_file, all_reads, min_align_per, max_edit_dist_per, worker_queue, writer_queue)) for _ in range(self.cpus)]
+            write_proc = mp.Process(target=self._writer, args=(coverage_info, len(ref_seq_ids), writer_queue))
 
             write_proc.start()
 
@@ -227,7 +218,7 @@ class Coverage():
 
             for seq_id, seq_len in zip(seq_ids, seq_lens):
                 readLoader = ReadLoader(all_reads, min_align_per, max_edit_dist_per)
-                bamfile.fetch(seq_id, 0, seq_len, callback = readLoader)
+                bamfile.fetch(seq_id, 0, seq_len, callback=readLoader)
 
                 coverage = float(readLoader.coverage) / seq_len
 
@@ -267,7 +258,7 @@ class Coverage():
 
             if self.logger.getEffectiveLevel() <= logging.INFO:
                 processed_ref_seqs += 1
-                statusStr = '    Finished processing %d of %d (%.2f%%) reference sequences.' % (processed_ref_seqs, num_reference_seqs, float(processed_ref_seqs)*100/num_reference_seqs)
+                statusStr = '    Finished processing %d of %d (%.2f%%) reference sequences.' % (processed_ref_seqs, num_reference_seqs, float(processed_ref_seqs) * 100 / num_reference_seqs)
                 sys.stderr.write('%s\r' % statusStr)
                 sys.stderr.flush()
 
@@ -280,23 +271,22 @@ class Coverage():
                 total_failed_proper_pair += num_failed_proper_pair
                 total_mapped_reads += num_mapped_reads
 
-            coverage_info[seq_id] = CoverageStruct(seq_len = seq_len, mapped_reads = num_mapped_reads, coverage = coverage)
+            coverage_info[seq_id] = CoverageStruct(seq_len=seq_len, mapped_reads=num_mapped_reads, coverage=coverage)
 
         if self.logger.getEffectiveLevel() <= logging.INFO:
             sys.stderr.write('\n')
 
             print ''
             print '    # total reads: %d' % total_reads
-            print '      # properly mapped reads: %d (%.1f%%)' % (total_mapped_reads, float(total_mapped_reads)*100/total_reads)
-            print '      # duplicate reads: %d (%.1f%%)' % (total_duplicates, float(total_duplicates)*100/total_reads)
-            print '      # secondary reads: %d (%.1f%%)' % (total_secondary, float(total_secondary)*100/total_reads)
-            print '      # reads failing QC: %d (%.1f%%)' % (total_failed_qc, float(total_failed_qc)*100/total_reads)
-            print '      # reads failing alignment length: %d (%.1f%%)' % (total_failed_align_len, float(total_failed_align_len)*100/total_reads)
-            print '      # reads failing edit distance: %d (%.1f%%)' % (total_failed_edit_dist, float(total_failed_edit_dist)*100/total_reads)
-            print '      # reads not properly paired: %d (%.1f%%)' % (total_failed_proper_pair, float(total_failed_proper_pair)*100/total_reads)
-            print ''
+            print '      # properly mapped reads: %d (%.1f%%)' % (total_mapped_reads, float(total_mapped_reads) * 100 / total_reads)
+            print '      # duplicate reads: %d (%.1f%%)' % (total_duplicates, float(total_duplicates) * 100 / total_reads)
+            print '      # secondary reads: %d (%.1f%%)' % (total_secondary, float(total_secondary) * 100 / total_reads)
+            print '      # reads failing QC: %d (%.1f%%)' % (total_failed_qc, float(total_failed_qc) * 100 / total_reads)
+            print '      # reads failing alignment length: %d (%.1f%%)' % (total_failed_align_len, float(total_failed_align_len) * 100 / total_reads)
+            print '      # reads failing edit distance: %d (%.1f%%)' % (total_failed_edit_dist, float(total_failed_edit_dist) * 100 / total_reads)
+            print '      # reads not properly paired: %d (%.1f%%)' % (total_failed_proper_pair, float(total_failed_proper_pair) * 100 / total_reads)
 
-    def parse_coverage(self, coverage_file):
+    def read(self, coverage_file):
         """Read coverage information from file.
 
         Parameters
@@ -306,22 +296,35 @@ class Coverage():
 
         Returns
         -------
-        dict : d[genome_id][scaffold_id][bam_id] -> coverage
-            Coverage profile for each genome.
+        dict : d[scaffold_id][bam_id] -> coverage
+            Coverage profile for each scaffold.
+        dict : d[scaffold_id] -> length
+            Length of each scaffold.
         """
 
-        coverage_stats = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
-        with open(coverage_file) as f:
-            f.readline()
+        try:
+            coverage = defaultdict(lambda: defaultdict(float))
+            length = {}
+            with open(coverage_file) as f:
+                header = f.readline().split('\t')
+                bam_ids = [x.strip() for x in header[2:]]
 
-            for line in f:
-                line_split = line.split('\t')
-                scaffold_id = line_split[0]
-                genome_id = line_split[1]
+                for line in f:
+                    line_split = line.split('\t')
+                    scaffold_id = line_split[0]
+                    scaffold_len = int(line_split[1])
 
-                for i in xrange(3, len(line_split), 3):
-                    bam_id = line_split[i]
-                    coverage = float(line_split[i+1])
-                    coverage_stats[genome_id][scaffold_id][bam_id] = coverage
+                    length[scaffold_id] = scaffold_len
 
-        return coverage_stats
+                    for i, cov in enumerate(line_split[2:]):
+                        coverage[scaffold_id][bam_ids[i]] = float(cov)
+        except IOError:
+            print '[Error] Failed to open signature file: %s' % coverage_file
+            sys.exit()
+        except:
+            print traceback.format_exc()
+            print ''
+            raise ParsingError("[Error] Failed to process coverage file: " + coverage_file)
+            sys.exit()
+
+        return coverage, length

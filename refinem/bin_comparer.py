@@ -108,6 +108,7 @@ class BinComparer(object):
         """
 
         # determine total number of sequences
+        self.logger.info('')
         self.logger.info('  Reading sequences.')
 
         seq_lens = {}
