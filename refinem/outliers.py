@@ -199,7 +199,7 @@ class Outliers():
             Critical values at integer percentiles.
         """
 
-        dist_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'distributions', prefix + '.txt')
+        dist_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'distributions', prefix + '.txt')
 
         with open(dist_file, 'r') as f:
             s = f.read()
