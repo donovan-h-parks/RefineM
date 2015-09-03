@@ -26,6 +26,7 @@ from biolib.common import remove_extension
 
 import biolib.seq_io as seq_io
 
+
 def concatenate_gene_files(gene_files, concatenated_gene_file):
     """Combine all gene files into a single file.
 

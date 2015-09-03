@@ -94,8 +94,10 @@ class ScaffoldStats(object):
         tetra = Tetranucleotide(self.cpus)
         signatures = tetra.read(tetra_file)
 
-        coverage = Coverage(self.cpus)
-        cov_profiles, _ = coverage.read(coverage_file)
+        cov_profiles = None
+        if coverage_file:
+            coverage = Coverage(self.cpus)
+            cov_profiles, _ = coverage.read(coverage_file)
 
         # determine bin assignment for each scaffold
         self.logger.info('')
@@ -111,9 +113,10 @@ class ScaffoldStats(object):
         fout = open(output_file, 'w')
         fout.write('Scaffold id\tGenome Id\tGC\tLength (bp)')
 
-        bam_ids = sorted(cov_profiles[cov_profiles.keys()[0]].keys())
-        for bam_id in bam_ids:
-            fout.write('\t' + bam_id)
+        if cov_profiles:
+            bam_ids = sorted(cov_profiles[cov_profiles.keys()[0]].keys())
+            for bam_id in bam_ids:
+                fout.write('\t' + bam_id)
 
         for kmer in tetra.canonical_order():
             fout.write('\t' + kmer)
@@ -125,8 +128,9 @@ class ScaffoldStats(object):
             fout.write('\t%.2f' % (seq_tk.gc(seq) * 100.0))
             fout.write('\t%d' % len(seq))
 
-            for bam_id in bam_ids:
-                fout.write('\t%.2f' % cov_profiles[scaffold_id][bam_id])
+            if cov_profiles:
+                for bam_id in bam_ids:
+                    fout.write('\t%.2f' % cov_profiles[scaffold_id][bam_id])
 
             fout.write('\t' + '\t'.join(map(str, signatures[scaffold_id])))
             fout.write('\n')

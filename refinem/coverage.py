@@ -184,6 +184,7 @@ class Coverage():
             writer_queue.put((None, None, None, None, None, None, None, None, None, None, None))
             write_proc.join()
         except:
+            print traceback.format_exc()
             for p in worker_proc:
                 p.terminate()
 

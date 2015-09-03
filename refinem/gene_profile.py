@@ -195,7 +195,7 @@ class GeneProfile(object):
 
         t = Taxonomy()
         taxonomy = t.read(taxonomy_file)
-        if not t.validate(taxonomy):
+        if not t.validate(taxonomy, check_prefixes=True, check_ranks=True, check_hierarchy=False, check_species=False, report_errors=True):
             self.logger.error('[Error]  Invalid taxonomy file.')
             sys.exit()
 

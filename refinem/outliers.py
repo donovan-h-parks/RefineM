@@ -1,8 +1,4 @@
 ###############################################################################
-#
-# coverage.py - calculate coverage of all sequences
-#
-###############################################################################
 #                                                                             #
 #    This program is free software: you can redistribute it and/or modify     #
 #    it under the terms of the GNU General Public License as published by     #
@@ -29,7 +25,7 @@ from scipy.stats import pearsonr
 from numpy import (mean as np_mean)
 
 import biolib.seq_io as seq_io
-from biolib.common import find_nearest
+from biolib.common import find_nearest, alphanumeric_sort
 from biolib.genomic_signature import GenomicSignature
 
 
@@ -38,7 +34,10 @@ class Outliers():
 
     def __init__(self):
         """Initialization."""
+
         self.logger = logging.getLogger()
+
+        self.min_required_coverage = 0.01
 
     def remove(self, genome_file, outlier_file, out_genome):
         """Remove sequences specified as outliers.
@@ -168,7 +167,8 @@ class Outliers():
 
                 mean_cp = []
                 for cov_genome, cov_scaffold in itertools.izip(gs.mean_coverage, stats.coverage):
-                    mean_cp.append(abs(cov_genome - cov_scaffold) * 100 / cov_genome)
+                    if cov_genome >= self.min_required_coverage:
+                        mean_cp.append(abs(cov_genome - cov_scaffold) * 100 / cov_genome)
 
                 mean_cp = np_mean(mean_cp)
                 if mean_cp > cov_perc:
@@ -183,6 +183,65 @@ class Outliers():
                     fout.write('\n')
 
         sys.stdout.write('\n')
+        fout.close()
+
+    def create_html_index(self, plot_dir, genome_plots):
+        """Create HTML index for navigating outlier plots.
+
+        Parameters
+        ----------
+        plot_dir : str
+          Directory containing plots.
+        genome_plots : d[genome_id] -> [(plot_type, plot_filename), ...]
+          Hash indicating the plot types and filenames for each genome of interest.
+        """
+
+        sorted_genome_ids = alphanumeric_sort(genome_plots.keys())
+
+        starting_plot_filename = genome_plots[sorted_genome_ids[0]][0][1]
+        starting_plot_str = sorted_genome_ids[0] + '<br>' + genome_plots[sorted_genome_ids[0]][0][0]
+
+        fout = open(os.path.join(plot_dir, 'index.html'), 'w')
+        fout.write('<html>\n')
+        fout.write('<head>')
+        fout.write('<title>RefineM outlier plots</title>\n')
+        fout.write('</head>\n')
+        fout.write('<frameset cols="15%,85%">\n')
+        fout.write('<frame src="plot_menu.html" name="menu">\n')
+        fout.write('<frame src="%s" name="plot">\n' % starting_plot_filename)
+        fout.write('</frameset>\n')
+        fout.write('</html>\n')
+        fout.close()
+
+        fout = open(os.path.join(plot_dir, 'plot_menu.html'), 'w')
+        fout.write('<html>\n')
+        fout.write('<script>\n')
+        fout.write('    function change_title(name) {\n')
+        fout.write('        document.getElementById("active_plot").innerHTML = name;\n')
+        fout.write('    }\n')
+        fout.write('</script>\n\n')
+        fout.write('<style>\n')
+        fout.write('ul {\n')
+        fout.write('margin-top: 0px;\n')
+        fout.write('margin-bottom: 12px;\n')
+        fout.write('}\n')
+        fout.write('</style>\n\n')
+        fout.write('<body>\n')
+        fout.write('<div><b>Active plot:</b>\n')
+        fout.write('<div id="active_plot">%s</div>\n' % starting_plot_str)
+        fout.write('</div>\n')
+        fout.write('<br>\n')
+        fout.write('<div><b>Plots:</b></div>\n')
+        for genome_id in sorted_genome_ids:
+            fout.write('<i>  %s:</i>\n' % genome_id)
+            fout.write('    <ul>\n')
+            for (plot_type, plot_filename) in genome_plots[genome_id]:
+                fout.write('    <li><a href="%s" target="plot" onclick="change_title(\'%s\');">%s</a><br></li>\n' % (plot_filename,
+                                                                                                                     genome_id + '<br>' + plot_type,
+                                                                                                                     plot_type))
+            fout.write('    </ul>\n')
+        fout.write('</body>\n')
+        fout.write('</html>\n')
         fout.close()
 
     def _read_distribution(self, prefix):

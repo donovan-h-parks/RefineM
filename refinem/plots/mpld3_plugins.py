@@ -21,17 +21,17 @@ import mpld3
 
 class LinkedBrush(mpld3.plugins.PluginBase):
     JAVASCRIPT = """
-        mpld3.LinkedBrushPlugin = mpld3_LinkedBrushPlugin;
-        mpld3.register_plugin("linkedbrush", mpld3_LinkedBrushPlugin);
-        mpld3_LinkedBrushPlugin.prototype = Object.create(mpld3.Plugin.prototype);
-        mpld3_LinkedBrushPlugin.prototype.constructor = mpld3_LinkedBrushPlugin;
-        mpld3_LinkedBrushPlugin.prototype.requiredProps = [ "id" ];
-        mpld3_LinkedBrushPlugin.prototype.defaultProps = {
+        mpld3.LinkedBrushPlugin = refinem_LinkedBrushPlugin;
+        mpld3.register_plugin("refinem_linkedbrush", refinem_LinkedBrushPlugin);
+        refinem_LinkedBrushPlugin.prototype = Object.create(mpld3.Plugin.prototype);
+        refinem_LinkedBrushPlugin.prototype.constructor = refinem_LinkedBrushPlugin;
+        refinem_LinkedBrushPlugin.prototype.requiredProps = [ "id" ];
+        refinem_LinkedBrushPlugin.prototype.defaultProps = {
           button: true,
           enabled: null
         };
 
-        function mpld3_LinkedBrushPlugin(fig, props) {
+        function refinem_LinkedBrushPlugin(fig, props) {
           mpld3.Plugin.call(this, fig, props);
           if (this.props.enabled === null) {
             this.props.enabled = !this.props.button;
@@ -39,7 +39,7 @@ class LinkedBrush(mpld3.plugins.PluginBase):
           var enabled = this.props.enabled;
           if (this.props.button) {
             var BrushButton = mpld3.ButtonFactory({
-              buttonID: "linkedbrush",
+              buttonID: "refinem_linkedbrush",
               sticky: true,
               actions: [ "drag" ],
               onActivate: this.activate.bind(this),
@@ -53,22 +53,22 @@ class LinkedBrush(mpld3.plugins.PluginBase):
             });
             this.fig.buttons.push(BrushButton);
           }
-          this.extentClass = "linkedbrush";
+          this.extentClass = "refinem_linkedbrush";
         }
 
-        mpld3_LinkedBrushPlugin.prototype.activate = function() {
+        refinem_LinkedBrushPlugin.prototype.activate = function() {
           if (this.enable) this.enable();
         };
 
-        mpld3_LinkedBrushPlugin.prototype.deactivate = function() {
+        refinem_LinkedBrushPlugin.prototype.deactivate = function() {
           if (this.disable) this.disable();
         };
 
-        mpld3_LinkedBrushPlugin.prototype.get_selected = function() {
+        refinem_LinkedBrushPlugin.prototype.get_selected = function() {
           if (this.get_selected) this.get_selected();
         };
 
-        mpld3_LinkedBrushPlugin.prototype.draw = function() {
+        refinem_LinkedBrushPlugin.prototype.draw = function() {
           var obj = mpld3.get_element(this.props.id);
           if (obj === null) {
             throw "LinkedBrush: no object with id='" + this.props.id + "' was found";
@@ -166,7 +166,7 @@ class LinkedBrush(mpld3.plugins.PluginBase):
             suffix = "pts"
         else:
             suffix = None
-        self.dict_ = {"type": "linkedbrush",
+        self.dict_ = {"type": "refinem_linkedbrush",
                       "button": button,
                       "enabled": False,
                       "id": mpld3.utils.get_id(points, suffix)}

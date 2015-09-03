@@ -2,6 +2,7 @@ from distutils.core import setup
 
 import os
 
+
 def version():
     setupDir = os.path.dirname(os.path.realpath(__file__))
     versionFile = open(os.path.join(setupDir, 'refinem', 'VERSION'))
@@ -12,7 +13,7 @@ setup(
     version=version(),
     author='Donovan Parks',
     author_email='donovan.parks@gmail.com',
-    packages=['refinem','refinem.plots'],
+    packages=['refinem', 'refinem.plots'],
     scripts=['bin/refinem'],
     package_data={'refinem' : ['VERSION', './distributions/*.txt']},
     url='http://pypi.python.org/pypi/refinem/',
@@ -22,7 +23,7 @@ setup(
     install_requires=[
         "numpy >= 1.8.0",
         "matplotlib >= 1.4.0",
-        "biolib >= 0.0.2",
+        "biolib >= 0.0.11",
         "jinja2 >= 2.7.3"
         "mpld3 >= 0.2"],
 )

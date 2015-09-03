@@ -143,6 +143,8 @@ class OptionsParser():
         self.logger.info(' [RefineM - scaffold_stats] Calculating statistics for scaffolds.')
         self.logger.info('*******************************************************************************')
 
+        check_file_exists(options.scaffold_file)
+
         if not self._check_nuclotide_seqs([options.scaffold_file]):
             self.logger.warning('[Warning] Scaffold file must contain nucleotide sequences.')
             sys.exit()
@@ -154,6 +156,20 @@ class OptionsParser():
 
         make_sure_path_exists(options.output_dir)
 
+        # get coverage information
+        if not options.coverage_file:
+            if not options.bam_files:
+                self.logger.warning('\n  [Warning] One or more BAM files must be specified in order to calculate coverage profiles.')
+                coverage_file = None
+            else:
+                coverage = Coverage(options.cpus)
+                coverage_file = os.path.join(options.output_dir, 'coverage.tsv')
+                coverage.run(options.bam_files, coverage_file, options.cov_all_reads, options.cov_min_align, options.cov_max_edit_dist)
+                self.logger.info('')
+                self.logger.info('  Coverage profiles written to: %s' % coverage_file)
+        else:
+            coverage_file = options.coverage_file
+
         # get tetranucleotide signatures
         if not options.tetra_file:
             self.logger.info('')
@@ -164,20 +180,6 @@ class OptionsParser():
             self.logger.info('  Tetranucleotide signatures written to: %s' % tetra_file)
         else:
             tetra_file = options.tetra_file
-
-        # get coverage information
-        if not options.coverage_file:
-            if not options.bam_files:
-                self.logger.warning('[Warning] One or more BAM files must be specified in order to calculate coverage profiles.')
-                sys.exit()
-
-            coverage = Coverage(options.cpus)
-            coverage_file = os.path.join(options.output_dir, 'coverage.tsv')
-            coverage.run(options.bam_files, coverage_file, options.cov_all_reads, options.cov_min_align, options.cov_max_edit_dist)
-            self.logger.info('')
-            self.logger.info('  Coverage profiles written to: %s' % coverage_file)
-        else:
-            coverage_file = options.coverage_file
 
         # write out scaffold statistics
         stats_output = os.path.join(options.output_dir, 'scaffold_stats.tsv')
@@ -276,6 +278,10 @@ class OptionsParser():
         if options.highlight_file:
             highlight_scaffolds_ids = {line.split('\t')[0].strip() for line in open(options.highlight_file)}
 
+        link_scaffold_ids = []
+        if options.links_file:
+            link_scaffold_ids = {line.strip().split('\t') for line in open(options.links_file)}
+
         genomes_processed = 0
         plot_dir = os.path.join(options.output_dir, 'plots')
         make_sure_path_exists(plot_dir)
@@ -295,7 +301,7 @@ class OptionsParser():
             if options.individual_plots:
                 # GC plot
                 gc_plots = GcPlots(options)
-                gc_plots.plot(genome_scaffold_stats, highlight_scaffolds_ids, gs.mean_gc, outliers.gc_dist, [options.gc_perc])
+                gc_plots.plot(genome_scaffold_stats, highlight_scaffolds_ids, link_scaffold_ids, gs.mean_gc, outliers.gc_dist, [options.gc_perc])
 
                 output_plot = os.path.join(plot_dir, genome_id + '.gc_plots.' + options.image_type)
                 gc_plots.save_plot(output_plot, dpi=options.dpi)
@@ -303,7 +309,7 @@ class OptionsParser():
 
                 # TD plot
                 td_plots = TdPlots(options)
-                td_plots.plot(genome_scaffold_stats, highlight_scaffolds_ids, gs.mean_signature, outliers.td_dist, [options.td_perc])
+                td_plots.plot(genome_scaffold_stats, highlight_scaffolds_ids, link_scaffold_ids, gs.mean_signature, outliers.td_dist, [options.td_perc])
 
                 output_plot = os.path.join(plot_dir, genome_id + '.td_plots.' + options.image_type)
                 td_plots.save_plot(output_plot, dpi=options.dpi)
@@ -311,7 +317,7 @@ class OptionsParser():
 
                 # mean absolute deviation of coverage profiles
                 cov_perc_plots = CovPercPlots(options)
-                cov_perc_plots.plot(genome_scaffold_stats, highlight_scaffolds_ids, gs.mean_coverage, [options.cov_perc])
+                cov_perc_plots.plot(genome_scaffold_stats, highlight_scaffolds_ids, link_scaffold_ids, gs.mean_coverage, [options.cov_perc])
 
                 output_plot = os.path.join(plot_dir, genome_id + '.cov_perc.' + options.image_type)
                 cov_perc_plots.save_plot(output_plot, dpi=options.dpi)
@@ -329,7 +335,9 @@ class OptionsParser():
             # combined plot of distributions
             dist_plots = DistributionPlots(options)
             dist_plots.plot(genome_scaffold_stats,
-                            highlight_scaffolds_ids, gs,
+                            highlight_scaffolds_ids,
+                            link_scaffold_ids,
+                            gs,
                             outliers.gc_dist, outliers.td_dist,
                             options.gc_perc, options.td_perc, options.cov_perc)
 

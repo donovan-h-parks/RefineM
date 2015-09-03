@@ -22,27 +22,30 @@ import mpld3
 from scipy.stats import pearsonr
 import numpy as np
 
-from biolib.plots.abstract_plot import AbstractPlot
-
+from refinem.plots.base_plot import BasePlot
 from refinem.plots.mpld3_plugins import Tooltip
 
 
-class CovCorrPlots(AbstractPlot):
+class CovCorrPlots(BasePlot):
     """Histogram and scatterplot showing coverage profile correlation of scaffolds."""
 
     def __init__(self, options):
         """Initialize."""
-        AbstractPlot.__init__(self, options)
+        BasePlot.__init__(self, options)
 
-    def plot(self, genome_scaffold_stats, highlight_scaffold_ids, mean_coverage, cov_corrs):
+    def plot(self, genome_scaffold_stats,
+             highlight_scaffold_ids, link_scaffold_ids,
+             mean_coverage, cov_corrs):
         """Setup figure for plots.
 
         Parameters
         ----------
         genome_scaffold_stats: d[scaffold_id] -> namedtuple of scaffold stats
           Statistics for scaffolds in genome.
-        highlight_scaffold_ids : iterable
+        highlight_scaffold_ids : d[scaffold_id] -> color
             Scaffolds in genome to highlight.
+        link_scaffold_ids : list of scaffold pairs
+            Pairs of scaffolds to link together.
         mean_coverage : float
           Mean coverage profile of genome.
         cov_corrs : iterable
@@ -62,14 +65,18 @@ class CovCorrPlots(AbstractPlot):
         axes_scatter = self.fig.add_subplot(122)
 
         self.plot_on_axes(self.fig, genome_scaffold_stats,
-                          highlight_scaffold_ids, mean_coverage, cov_corrs,
+                          highlight_scaffold_ids,
+                          link_scaffold_ids,
+                          mean_coverage, cov_corrs,
                           axes_hist, axes_scatter, True)
 
         self.fig.tight_layout(pad=1, w_pad=1)
         self.draw()
 
     def plot_on_axes(self, figure,
-                     genome_scaffold_stats, highlight_scaffold_ids,
+                     genome_scaffold_stats,
+                     highlight_scaffold_ids,
+                     link_scaffold_ids,
                      mean_coverage, cov_corrs,
                      axes_hist, axes_scatter, tooltip_plugin):
         """Create histogram and scatterplot.
@@ -80,8 +87,10 @@ class CovCorrPlots(AbstractPlot):
           Figure on which to render axes.
         genome_scaffold_stats: d[scaffold_id] -> namedtuple of scaffold stats
           Statistics for scaffolds in genome.
-        highlight_scaffold_ids : iterable
+        highlight_scaffold_ids : d[scaffold_id] -> color
             Scaffolds in genome to highlight.
+        link_scaffold_ids : list of scaffold pairs
+            Pairs of scaffolds to link together.
         mean_coverage : float
           Mean coverage profile of genome.
         cov_corrs : iterable
@@ -102,39 +111,31 @@ class CovCorrPlots(AbstractPlot):
             correlations.append(corr_r)
 
         # histogram plot
-        axes_hist.hist(correlations, bins=20, color=(0.5, 0.5, 0.5))
-        axes_hist.set_xlabel("coverage correlation\n(Pearson's $r$)")
-        axes_hist.set_ylabel('# scaffolds of %d' % len(correlations))
+        if axes_hist:
+            axes_hist.hist(correlations, bins=20, color=(0.5, 0.5, 0.5))
+            axes_hist.set_xlabel("coverage correlation\n(Pearson's $r$)")
+            axes_hist.set_ylabel('# scaffolds (out of %d)' % len(correlations))
+            self.prettify(axes_hist)
 
-        # prettify histogram plot
-        self.prettify(axes_hist)
+        # scatterplot
+        xlabel = "coverage correlation\n(Pearson's $r$)"
+        ylabel = 'Scaffold length (kbp)'
 
-        # delta-GC vs sequence length (in kbp) scatterplot
-        # highlighted points are put last in the list so they are plotted on top
-        sorted_correlations = []
-        scaffold_lens = []
-        colours = []
-        labels = []
+        scaffold_stats = {}
         for i, (scaffold_id, stats) in enumerate(genome_scaffold_stats.iteritems()):
-            if scaffold_id not in highlight_scaffold_ids:
-                sorted_correlations.append(correlations[i])
-                scaffold_lens.append(stats.length / 1000.0)
-                colours.append((0.7, 0.7, 0.7))
-                labels.append('<small>{title}</small>'.format(title=scaffold_id))
+            scaffold_stats[scaffold_id] = (correlations[i], stats.length / 1000.0)
 
-        for i, (scaffold_id, stats) in enumerate(genome_scaffold_stats.iteritems()):
-            if scaffold_id in highlight_scaffold_ids:
-                sorted_correlations.append(correlations[i])
-                scaffold_lens.append(stats.length / 1000.0)
-                colours.append((1.0, 0, 0))
-                labels.append('<small>{title}</small>'.format(title=scaffold_id))
-
-        scatter = axes_scatter.scatter(sorted_correlations, scaffold_lens, c=colours, s=self.options.point_size, lw=0.5)
-        axes_scatter.set_xlabel("coverage correlation\n(Pearson's $r$)")
-        axes_scatter.set_ylabel('Scaffold length (kbp)')
+        scatter, labels = self.scatter(axes_scatter,
+                                         scaffold_stats,
+                                         highlight_scaffold_ids,
+                                         link_scaffold_ids,
+                                         xlabel, ylabel)
 
         _, ymax = axes_scatter.get_ylim()
         xmin, xmax = axes_scatter.get_xlim()
+
+        # draw vertical line at x=0
+        axes_scatter.plot([0, 0], [0, ymax], linestyle='dashed', color=self.axes_colour, lw=1.0, zorder=0)
 
         # ensure y-axis include zero and covers all sequences
         axes_scatter.set_ylim([0, ymax])

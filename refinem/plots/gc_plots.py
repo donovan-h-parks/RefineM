@@ -20,28 +20,30 @@ import numpy as np
 import matplotlib
 import mpld3
 
-from biolib.plots.abstract_plot import AbstractPlot
 from biolib.common import find_nearest
 
+from refinem.plots.base_plot import BasePlot
 from refinem.plots.mpld3_plugins import Tooltip
 
 
-class GcPlots(AbstractPlot):
+class GcPlots(BasePlot):
     """Create histogram and scatterplot showing GC distribution of scaffolds."""
 
     def __init__(self, options):
         """Initialize."""
-        AbstractPlot.__init__(self, options)
+        BasePlot.__init__(self, options)
 
-    def plot(self, genome_scaffold_stats, highlight_scaffold_ids, mean_gc, gc_dist, percentiles_to_plot):
+    def plot(self, genome_scaffold_stats, highlight_scaffold_ids, link_scaffold_ids, mean_gc, gc_dist, percentiles_to_plot):
         """Setup figure for plots.
 
         Parameters
         ----------
         genome_scaffold_stats : d[scaffold_id] -> namedtuple of scaffold stats
           Statistics for scaffolds in genome.
-        highlight_scaffold_ids : iterable
+        highlight_scaffold_ids : d[scaffold_id] -> color
             Scaffolds in genome to highlight.
+        link_scaffold_ids : list of scaffold pairs
+            Pairs of scaffolds to link together.
         mean_gc : float
           Mean GC of genome.
         gc_dist : d[gc][length][percentile] -> critical value
@@ -62,7 +64,9 @@ class GcPlots(AbstractPlot):
         axes_hist = self.fig.add_subplot(121)
         axes_scatter = self.fig.add_subplot(122)
 
-        self.plot_on_axes(self.fig, genome_scaffold_stats, highlight_scaffold_ids,
+        self.plot_on_axes(self.fig, genome_scaffold_stats,
+                          highlight_scaffold_ids,
+                          link_scaffold_ids,
                           mean_gc, gc_dist, percentiles_to_plot,
                           axes_hist, axes_scatter, True)
 
@@ -70,7 +74,8 @@ class GcPlots(AbstractPlot):
         self.draw()
 
     def plot_on_axes(self, figure,
-                     genome_scaffold_stats, highlight_scaffold_ids,
+                     genome_scaffold_stats,
+                     highlight_scaffold_ids, link_scaffold_ids,
                      mean_gc, gc_dist, percentiles_to_plot,
                      axes_hist, axes_scatter, tooltip_plugin):
         """Create histogram and scatterplot.
@@ -81,8 +86,10 @@ class GcPlots(AbstractPlot):
           Figure on which to render axes.
         genome_scaffold_stats : d[scaffold_id] -> namedtuple of scaffold stats
           Statistics for scaffolds in genome.
-        highlight_scaffold_ids : iterable
+        highlight_scaffold_ids : d[scaffold_id] -> color
             Scaffolds in genome to highlight.
+        link_scaffold_ids : list of scaffold pairs
+            Pairs of scaffolds to link together.
         mean_gc : float
           Mean GC of genome.
         gc_dist : d[gc][length][percentile] -> critical value
@@ -92,45 +99,30 @@ class GcPlots(AbstractPlot):
         """
 
         # histogram plot
-        gc_min, gc_max = 20, 80
-        gc_step = 2
+        if axes_hist:
+            scaffold_gc = [stats.gc for stats in genome_scaffold_stats.values()]
+            ylabel = '# scaffolds (out of %d)' % len(scaffold_gc)
+            self.histogram(axes_hist, scaffold_gc, 20, 80, 2, '% GC', ylabel)
 
-        scaffold_gc = [stats.gc for stats in genome_scaffold_stats.values()]
-        axes_hist.hist(scaffold_gc, bins=xrange(gc_min, gc_max, gc_step), color=(0.5, 0.5, 0.5))
-        axes_hist.set_xlabel('% GC')
-        axes_hist.set_ylabel('# scaffolds of %d' % len(scaffold_gc))
-        axes_hist.set_xlim([gc_min, gc_max])
+        # scatterplot
+        xlabel = 'deviation in GC (mean GC = %.1f%%)' % mean_gc
+        ylabel = 'Scaffold length (kbp)'
 
-        # prettify histogram plot
-        self.prettify(axes_hist)
-
-        # delta-GC vs sequence length (in kbp) scatterplot
-        # highlighted points are put last in the list so they are plotted on top
-        delta_gcs = []
-        scaffold_lens = []
-        colours = []
-        labels = []
+        scaffold_stats = {}
         for scaffold_id, stats in genome_scaffold_stats.iteritems():
-            if scaffold_id not in highlight_scaffold_ids:
-                delta_gcs.append(stats.gc - mean_gc)
-                scaffold_lens.append(stats.length / 1000.0)
-                colours.append((0.7, 0.7, 0.7))
-                labels.append('<small>{title}</small>'.format(title=scaffold_id))
+            scaffold_stats[scaffold_id] = (stats.gc - mean_gc, stats.length / 1000.0)
 
-        for scaffold_id, stats in genome_scaffold_stats.iteritems():
-            if scaffold_id in highlight_scaffold_ids:
-                delta_gcs.append(stats.gc - mean_gc)
-                scaffold_lens.append(stats.length / 1000.0)
-                colours.append((1.0, 0, 0))
-                labels.append('<small>{title}</small>'.format(title=scaffold_id))
-
-        scatter = axes_scatter.scatter(delta_gcs, scaffold_lens, c=colours, s=self.options.point_size, lw=0.5)
-        # axes_scatter.set_xlabel('$\Delta$ GC (mean GC = %.1f%%)' % mean_gc)
-        axes_scatter.set_xlabel('deviation in GC (mean GC = %.1f%%)' % mean_gc)
-        axes_scatter.set_ylabel('Scaffold length (kbp)')
+        scatter, labels = self.scatter(axes_scatter,
+                                         scaffold_stats,
+                                         highlight_scaffold_ids,
+                                         link_scaffold_ids,
+                                         xlabel, ylabel)
 
         _, ymax = axes_scatter.get_ylim()
         xmin, xmax = axes_scatter.get_xlim()
+
+        # draw vertical line at x=0
+        axes_scatter.plot([0, 0], [0, ymax], linestyle='dashed', color=self.axes_colour, lw=1.0, zorder=0)
 
         # plot reference distributions
         closest_gc = find_nearest(np.array(gc_dist.keys()), mean_gc / 100)
@@ -162,12 +154,6 @@ class GcPlots(AbstractPlot):
 
         # ensure x-axis is set appropriately for sequences
         axes_scatter.set_xlim([xmin, xmax])
-
-        # draw vertical line at x=0
-        axes_scatter.plot([0, 0], [0, ymax], linestyle='dashed', color=self.axes_colour, lw=1.0, zorder=0)
-
-        # prettify scatterplot
-        self.prettify(axes_scatter)
 
         # tooltips plugin
         if tooltip_plugin:

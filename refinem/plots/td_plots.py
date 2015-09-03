@@ -19,29 +19,33 @@ import numpy as np
 
 import mpld3
 
-from biolib.plots.abstract_plot import AbstractPlot
 from biolib.common import find_nearest
 from biolib.genomic_signature import GenomicSignature
 
+from refinem.plots.base_plot import BasePlot
 from refinem.plots.mpld3_plugins import Tooltip
 
 
-class TdPlots(AbstractPlot):
+class TdPlots(BasePlot):
     """Create histogram and scatterplot showing tetranucleotide distribution (TD) of scaffolds."""
 
     def __init__(self, options):
         """Initialize."""
-        AbstractPlot.__init__(self, options)
+        BasePlot.__init__(self, options)
 
-    def plot(self, genome_scaffold_stats, highlight_scaffold_ids, mean_signature, td_dist, percentiles_to_plot):
+    def plot(self, genome_scaffold_stats,
+             highlight_scaffold_ids, link_scaffold_ids,
+             mean_signature, td_dist, percentiles_to_plot):
         """Setup figure for plots.
 
         Parameters
         ----------
         genome_scaffold_stats: d[scaffold_id] -> namedtuple of scaffold stats
           Statistics for scaffolds in genome.
-        highlight_scaffold_ids : iterable
+        highlight_scaffold_ids : d[scaffold_id] -> color
             Scaffolds in genome to highlight.
+        link_scaffold_ids : list of scaffold pairs
+            Pairs of scaffolds to link together.
         mean_signature : float
           Mean tetranucleotide signature of genome.
         td_dist : d[length][percentile] -> critical value
@@ -63,7 +67,9 @@ class TdPlots(AbstractPlot):
         axes_scatter = self.fig.add_subplot(122)
 
         self.plot_on_axes(self.fig,
-                          genome_scaffold_stats, highlight_scaffold_ids,
+                          genome_scaffold_stats,
+                          highlight_scaffold_ids,
+                          link_scaffold_ids,
                           mean_signature, td_dist, percentiles_to_plot,
                           axes_hist, axes_scatter, True)
 
@@ -71,7 +77,8 @@ class TdPlots(AbstractPlot):
         self.draw()
 
     def plot_on_axes(self, figure,
-                     genome_scaffold_stats, highlight_scaffold_ids,
+                     genome_scaffold_stats,
+                     highlight_scaffold_ids, link_scaffold_ids,
                      mean_signature, td_dist, percentiles_to_plot,
                      axes_hist, axes_scatter, tooltip_plugin):
         """Create histogram and scatterplot.
@@ -82,8 +89,10 @@ class TdPlots(AbstractPlot):
           Figure on which to render axes.
         genome_scaffold_stats: d[scaffold_id] -> namedtuple of scaffold stats
           Statistics for scaffolds in genome.
-        highlight_scaffold_ids : iterable
+        highlight_scaffold_ids : d[scaffold_id] -> color
             Scaffolds in genome to highlight.
+        link_scaffold_ids : list of scaffold pairs
+            Pairs of scaffolds to link together.
         mean_signature : float
           Mean tetranucleotide signature of genome.
         td_dist : d[length][percentile] -> critical value
@@ -98,36 +107,26 @@ class TdPlots(AbstractPlot):
         delta_tds = []
         for stats in genome_scaffold_stats.values():
             delta_tds.append(genomic_signature.manhattan(stats.signature, mean_signature))
-        axes_hist.hist(delta_tds, bins=20, color=(0.5, 0.5, 0.5))
-        axes_hist.set_xlabel('tetranucleotide distance')
-        axes_hist.set_ylabel('# scaffolds of %d' % len(delta_tds))
 
-        # prettify histogram plot
-        self.prettify(axes_hist)
+        if axes_hist:
+            axes_hist.hist(delta_tds, bins=20, color=(0.5, 0.5, 0.5))
+            axes_hist.set_xlabel('tetranucleotide distance')
+            axes_hist.set_ylabel('# scaffolds (out of %d)' % len(delta_tds))
+            self.prettify(axes_hist)
 
-        # delta-TD vs scaffold length (in kbp) scatterplot
-        # highlighted points are put last in the list so they are plotted on top
-        sorted_delta_tds = []
-        scaffold_lens = []
-        colours = []
-        labels = []
+        # scatterplot
+        xlabel = 'tetranucleotide distance'
+        ylabel = 'Scaffold length (kbp)'
+
+        scaffold_stats = {}
         for i, (scaffold_id, stats) in enumerate(genome_scaffold_stats.iteritems()):
-            if scaffold_id not in highlight_scaffold_ids:
-                sorted_delta_tds.append(delta_tds[i])
-                scaffold_lens.append(stats.length / 1000.0)
-                colours.append((0.7, 0.7, 0.7))
-                labels.append('<small>{title}</small>'.format(title=scaffold_id))
+            scaffold_stats[scaffold_id] = (delta_tds[i], stats.length / 1000.0)
 
-        for i, (scaffold_id, stats) in enumerate(genome_scaffold_stats.iteritems()):
-            if scaffold_id in highlight_scaffold_ids:
-                sorted_delta_tds.append(delta_tds[i])
-                scaffold_lens.append(stats.length / 1000.0)
-                colours.append((1.0, 0, 0))
-                labels.append('<small>{title}</small>'.format(title=scaffold_id))
-
-        scatter = axes_scatter.scatter(sorted_delta_tds, scaffold_lens, c=colours, s=self.options.point_size, lw=0.5)
-        axes_scatter.set_xlabel('tetranucleotide distance')
-        axes_scatter.set_ylabel('Scaffold length (kbp)')
+        scatter, labels = self.scatter(axes_scatter,
+                                         scaffold_stats,
+                                         highlight_scaffold_ids,
+                                         link_scaffold_ids,
+                                         xlabel, ylabel)
 
         _, ymax = axes_scatter.get_ylim()
         xmin, xmax = axes_scatter.get_xlim()
