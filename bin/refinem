@@ -67,6 +67,7 @@ def print_help():
     Reduce contamination:
      gene_profile   -> Generate a taxonomic profile from the genes within a genome
      outliers       -> Identify scaffolds with divergent GC, coverage, or tetranucleotide signatures
+     cluster        -> Partition genome into K distinct clusters
      euk_origin     -> [not implemented] Identify scaffolds with a coding density suggestive of a Eukaryotic origin
 
     Improve completeness:
@@ -101,7 +102,7 @@ if __name__ == '__main__':
     # Calculate scaffold statistics
     stats_parser = subparsers.add_parser('scaffold_stats',
                                             formatter_class=CustomHelpFormatter,
-                                            description='Calculate statistics for scaffolds')
+                                            description='Calculate statistics for scaffolds.')
 
     stats_parser.add_argument('scaffold_file', help="scaffolds binned to generate putative genomes")
     stats_parser.add_argument('genome_nt_dir', help="directory containing nucleotide scaffolds for each genome")
@@ -118,7 +119,7 @@ if __name__ == '__main__':
     # Calculate genome statistics
     genome_stats_parser = subparsers.add_parser('genome_stats',
                                             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                            description='Calculate statistics for genomes')
+                                            description='Calculate statistics for genomes.')
 
     genome_stats_parser.add_argument('scaffold_stats_file', help="file with statistics for each scaffold")
     genome_stats_parser.add_argument('output_file', help="output file with genome statistics")
@@ -143,7 +144,7 @@ if __name__ == '__main__':
     # Identify outlier sequences
     outlier_parser = subparsers.add_parser('outliers',
                                             formatter_class=CustomHelpFormatter,
-                                            description='Identify scaffolds with divergent genomic characteristics')
+                                            description='Identify scaffolds with divergent genomic characteristics.')
     outlier_parser.add_argument('scaffold_stats_file', help="file with statistics for each scaffold")
     outlier_parser.add_argument('output_dir', help="output directory")
     outlier_parser.add_argument('--gc_perc', help='percentile for identify scaffolds with divergent GC content', type=int, choices=xrange(0, 101), default=95, metavar='int')
@@ -160,6 +161,16 @@ if __name__ == '__main__':
     outlier_parser.add_argument('--font_size', type=int, default=12, help='desired font size')
     outlier_parser.add_argument('--width', type=float, default=10, help='width of output image')
     outlier_parser.add_argument('--height', type=float, default=8, help='height of output image')
+
+    # Cluster sequences
+    cluster_parser = subparsers.add_parser('cluster',
+                                            formatter_class=CustomHelpFormatter,
+                                            description='Partition genome into K distinct clusters.')
+    cluster_parser.add_argument('scaffold_stats_file', help="file with statistics for each scaffold")
+    cluster_parser.add_argument('genome_file', help='genome bin to cluster')
+    cluster_parser.add_argument('K', help='number of desired clusters', type=int)
+    cluster_parser.add_argument('output_dir', help="output directory")
+    cluster_parser.add_argument('-i', '--iterations', help="iterations to perform during clustering", type=int, default=100)
 
     # identify scaffolds with similarity to a set of reference genomes
     reference_parser = subparsers.add_parser('reference',

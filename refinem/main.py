@@ -18,6 +18,7 @@
 import os
 import sys
 import logging
+from collections import defaultdict
 
 from refinem.scaffold_stats import ScaffoldStats
 from refinem.genome_stats import GenomeStats
@@ -28,11 +29,15 @@ from refinem.unbinned import Unbinned
 from refinem.coverage import Coverage
 from refinem.tetranucleotide import Tetranucleotide
 from refinem.outliers import Outliers
+from refinem.cluster import Cluster
 from refinem.plots.gc_plots import GcPlots
 from refinem.plots.td_plots import TdPlots
 from refinem.plots.cov_perc_plots import CovPercPlots
 from refinem.plots.cov_corr_plots import CovCorrPlots
 from refinem.plots.distribution_plots import DistributionPlots
+from refinem.plots.gc_cov_plot import GcCovPlot
+from refinem.plots.tetra_pca_plot import TetraPcaPlot
+from refinem.plots.combined_plots import CombinedPlots
 
 import biolib.seq_io as seq_io
 import biolib.genome_tk as genome_tk
@@ -282,9 +287,11 @@ class OptionsParser():
         if options.links_file:
             link_scaffold_ids = {line.strip().split('\t') for line in open(options.links_file)}
 
+        # create plots
         genomes_processed = 0
         plot_dir = os.path.join(options.output_dir, 'plots')
         make_sure_path_exists(plot_dir)
+        genome_plots = defaultdict(list)
         for genome_id, gs in genome_stats.iteritems():
             genomes_processed += 1
 
@@ -332,6 +339,19 @@ class OptionsParser():
                     cov_corr_plots.save_plot(output_plot, dpi=options.dpi)
                     cov_corr_plots.save_html(os.path.join(plot_dir, genome_id + '.cov_corr.html'))
 
+            # combined distribution, GC vs. coverage, and tetranucleotide signature plots
+            combined_plots = CombinedPlots(options)
+            combined_plots.plot(genome_scaffold_stats,
+                            highlight_scaffolds_ids, link_scaffold_ids, gs,
+                            outliers.gc_dist, outliers.td_dist,
+                            options.gc_perc, options.td_perc, options.cov_perc)
+
+            output_plot = os.path.join(plot_dir, genome_id + '.combined.' + options.image_type)
+            combined_plots.save_plot(output_plot, dpi=options.dpi)
+            combined_plots.save_html(os.path.join(plot_dir, genome_id + '.combined.html'))
+
+            genome_plots[genome_id].append(('Combined', genome_id + '.combined.html'))
+
             # combined plot of distributions
             dist_plots = DistributionPlots(options)
             dist_plots.plot(genome_scaffold_stats,
@@ -345,9 +365,59 @@ class OptionsParser():
             dist_plots.save_plot(output_plot, dpi=options.dpi)
             dist_plots.save_html(os.path.join(plot_dir, genome_id + '.dist_plot.html'))
 
+            genome_plots[genome_id].append(('Distributions', genome_id + '.dist_plot.html'))
+
+            # GC vs. coverage plot
+            gc_cov_plot = GcCovPlot(options)
+            gc_cov_plot.plot(genome_scaffold_stats,
+                             highlight_scaffolds_ids, link_scaffold_ids,
+                             gs.mean_gc, gs.mean_coverage)
+
+            output_plot = os.path.join(plot_dir, genome_id + '.gc_coverge.' + options.image_type)
+            gc_cov_plot.save_plot(output_plot, dpi=options.dpi)
+            gc_cov_plot.save_html(os.path.join(plot_dir, genome_id + '.gc_coverge.html'))
+
+            genome_plots[genome_id].append(('GC vs. coverage', genome_id + '.gc_coverge.html'))
+
+            # tetranucleotide signature PCA plot
+            tetra = TetraPcaPlot(options)
+            tetra.plot(genome_scaffold_stats, highlight_scaffolds_ids, link_scaffold_ids)
+
+            output_plot = os.path.join(plot_dir, genome_id + '.tetra_pca.' + options.image_type)
+            tetra.save_plot(output_plot, dpi=options.dpi)
+            tetra.save_html(os.path.join(plot_dir, genome_id + '.tetra_pca.html'))
+
+            genome_plots[genome_id].append(('Tetra PCA', genome_id + '.tetra_pca.html'))
+
         sys.stdout.write('\n')
 
+        outliers.create_html_index(plot_dir, genome_plots)
+
         self.logger.info('  Outlier plots written to: ' + plot_dir)
+
+        self.time_keeper.print_time_stamp()
+
+    def cluster(self, options):
+        """Cluster command"""
+        self.logger.info('')
+        self.logger.info('*******************************************************************************')
+        self.logger.info(' [RefineM - cluster] Partitioning genome into K distinct clusters.')
+        self.logger.info('*******************************************************************************')
+
+        check_file_exists(options.scaffold_stats_file)
+        check_file_exists(options.genome_file)
+        make_sure_path_exists(options.output_dir)
+
+        self.logger.info('')
+        self.logger.info('  Reading scaffold statistics.')
+        scaffold_stats = ScaffoldStats()
+        scaffold_stats.read(options.scaffold_stats_file)
+
+        cluster = Cluster()
+        cluster.run(scaffold_stats, options.K, options.iterations, options.genome_file, options.output_dir)
+
+        self.logger.info('')
+        self.logger.info('  Partitioned sequences written to: ' + options.output_dir)
 
         self.time_keeper.print_time_stamp()
 
@@ -561,6 +631,8 @@ class OptionsParser():
             self.gene_profile(options)
         elif(options.subparser_name == 'outliers'):
             self.outliers(options)
+        elif(options.subparser_name == 'cluster'):
+            self.cluster(options)
         elif(options.subparser_name == 'reference'):
             self.reference(options)
         elif(options.subparser_name == 'unique'):
