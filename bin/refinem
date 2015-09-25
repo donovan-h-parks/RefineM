@@ -67,7 +67,7 @@ def print_help():
     Reduce contamination:
      gene_profile   -> Generate a taxonomic profile from the genes within a genome
      outliers       -> Identify scaffolds with divergent GC, coverage, or tetranucleotide signatures
-     cluster        -> Partition genome into K distinct clusters
+     cluster        -> Partition bin into clusters
      euk_origin     -> [not implemented] Identify scaffolds with a coding density suggestive of a Eukaryotic origin
 
     Improve completeness:
@@ -150,7 +150,7 @@ if __name__ == '__main__':
     outlier_parser.add_argument('--gc_perc', help='percentile for identify scaffolds with divergent GC content', type=int, choices=xrange(0, 101), default=95, metavar='int')
     outlier_parser.add_argument('--td_perc', help='percentile for identify scaffolds with divergent tetranucleotide signatures', type=int, choices=xrange(0, 101), default=95, metavar='int')
     outlier_parser.add_argument('--cov_corr', help='correlation for identifying scaffolds with divergent coverage profiles', type=float, default=0.8)
-    outlier_parser.add_argument('--cov_perc', help='mean percent deviation for identifying scaffolds with divergent coverage profiles', type=int, choices=xrange(0, 301), default=50, metavar='int')
+    outlier_parser.add_argument('--cov_perc', help='mean percent difference for identifying scaffolds with divergent coverage profiles', type=int, choices=xrange(0, 301), default=50, metavar='int')
     outlier_parser.add_argument('-r', '--report_type', help="report sequences that are outliers in 'all' or 'any' reference distribution", choices=['any', 'all'], default='any')
     outlier_parser.add_argument('--individual_plots', action="store_true", default=False, help='create individual plots for each statistic')
     outlier_parser.add_argument('--image_type', default='png', choices=['eps', 'pdf', 'png', 'ps', 'svg'], help='desired image type')
@@ -165,12 +165,17 @@ if __name__ == '__main__':
     # Cluster sequences
     cluster_parser = subparsers.add_parser('cluster',
                                             formatter_class=CustomHelpFormatter,
-                                            description='Partition genome into K distinct clusters.')
+                                            description='Partition bin into clusters.')
     cluster_parser.add_argument('scaffold_stats_file', help="file with statistics for each scaffold")
     cluster_parser.add_argument('genome_file', help='genome bin to cluster')
-    cluster_parser.add_argument('K', help='number of desired clusters', type=int)
+    cluster_parser.add_argument('num_clusters', help='number of desired clusters', type=int)
     cluster_parser.add_argument('output_dir', help="output directory")
-    cluster_parser.add_argument('-i', '--iterations', help="iterations to perform during clustering", type=int, default=100)
+    cluster_parser.add_argument('-i', '--iterations', help="iterations to perform during clustering", type=int, default=1000)
+    cluster_parser.add_argument('--num_components', help="number of PCA components of genomic signature to consider", type=int, default=3)
+    cluster_parser.add_argument('-K', help="K-mer size to use for calculating genomic signature", type=int, default=4)
+    cluster_parser.add_argument('--no_coverage', help="do not use coverage information for clustering", action='store_true')
+    cluster_parser.add_argument('--no_pca', help="do not calculate PCA of genomic signature", action='store_true')
+    cluster_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
 
     # identify scaffolds with similarity to a set of reference genomes
     reference_parser = subparsers.add_parser('reference',

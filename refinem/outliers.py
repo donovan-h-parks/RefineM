@@ -168,7 +168,7 @@ class Outliers():
                 mean_cp = []
                 for cov_genome, cov_scaffold in itertools.izip(gs.mean_coverage, stats.coverage):
                     if cov_genome >= self.min_required_coverage:
-                        mean_cp.append(abs(cov_genome - cov_scaffold) * 100 / cov_genome)
+                        mean_cp.append(abs(cov_genome - cov_scaffold) * 100 / np_mean(cov_genome, cov_scaffold))
 
                 mean_cp = np_mean(mean_cp)
                 if mean_cp > cov_perc:

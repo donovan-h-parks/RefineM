@@ -28,22 +28,26 @@ from numpy import (where as np_where,
                    array as np_array,
                    append as np_append,
                    ones as np_ones,
-                   zeros as np_zeros)
+                   zeros as np_zeros,
+                   all as np_all)
 
 from biolib.common import remove_extension
 from biolib.pca import PCA
 import biolib.seq_io as seq_io
+from biolib.genomic_signature import GenomicSignature
 
-from scipy.cluster.vq import whiten, kmeans2
+from scipy.cluster.vq import whiten, kmeans2, ClusterError
 
 
 class Cluster():
     """Partition genome into distinct clusters."""
 
-    def __init__(self):
+    def __init__(self, cpus):
         """Initialization."""
 
         self.logger = logging.getLogger()
+
+        self.cpus = cpus
 
     def pca(self, data_matrix):
         """Perform PCA.
@@ -73,15 +77,23 @@ class Cluster():
 
         return pc, variance
 
-    def run(self, scaffold_stats, K, iterations, genome_file, output_dir):
+    def run(self, scaffold_stats, num_clusters, num_components, K, no_coverage, no_pca, iterations, genome_file, output_dir):
         """Calculate statistics for genomes.
 
         Parameters
         ----------
         scaffold_stats : ScaffoldStats
             Statistics for individual scaffolds.
-        K : int
+        num_clusters : int
             Number of cluster to form.
+        num_components : int
+            Number of PCA components to consider.
+        K : int
+            K-mer size to use for calculating genomic signature.
+        no_coverage : boolean
+            Flag indicating if coverage information should be used during clustering.
+        no_pca : boolean
+            Flag indicating if PCA of genomic signature should be calculated.
         iterations : int
             Iterations of clustering to perform.
         genome_file : str
@@ -92,38 +104,68 @@ class Cluster():
 
         # get GC and mean coverage for each scaffold in genome
         self.logger.info('')
-        self.logger.info('  Determining GC-content and mean coverage.')
+        self.logger.info('  Determining mean coverage and genomic signatures.')
+        signatures = GenomicSignature(K)
         genome_stats = []
         signature_matrix = []
         seqs = seq_io.read(genome_file)
-        for seq_id in seqs:
+        for seq_id, seq in seqs.iteritems():
             stats = scaffold_stats.stats[seq_id]
 
-            genome_stats.append((stats.gc, np_mean(stats.coverage)))
-            signature_matrix.append(stats.signature)
+            if not no_coverage:
+                genome_stats.append((np_mean(stats.coverage)))
+            else:
+                genome_stats.append(())
+
+            if K == 0:
+                pass
+            elif K == 4:
+                signature_matrix.append(stats.signature)
+            else:
+                sig = signatures.seq_signature(seq)
+                total_kmers = sum(sig)
+                for i in xrange(0, len(sig)):
+                    sig[i] = float(sig[i]) / total_kmers
+                signature_matrix.append(sig)
 
         # calculate PCA of tetranucleotide signatures
-        self.logger.info('')
-        self.logger.info('  Calculating PCA of tetranucleotide signatures.')
-        pc, variance = self.pca(signature_matrix)
-        self.logger.info('    First 3 PCs capture %.1f%% of the variance.' % (sum(variance[0:3]) * 100))
+        if K != 0:
+            if not no_pca:
+                self.logger.info('  Calculating PCA of genomic signatures.')
+                pc, variance = self.pca(signature_matrix)
+                self.logger.info('    First %d PCs capture %.1f%% of the variance.' % (num_components, sum(variance[0:num_components]) * 100))
+    
+                for i, stats in enumerate(genome_stats):
+                    genome_stats[i] = np_append(stats, pc[i][0:num_components])
+            else:
+                self.logger.info('  Using complete genomic signature.')
+                for i, stats in enumerate(genome_stats):
+                    genome_stats[i] = np_append(stats, signature_matrix[i])
 
-        for i, stats in enumerate(genome_stats):
-            genome_stats[i] = np_append(stats, pc[i][0:3])
-
-        # whiten data
-        genome_stats = whiten(genome_stats)
+        # whiten data if feature matrix contains coverage and genomic signature data
+        if not no_coverage and K != 0:
+            print '  Whitening data.'
+            genome_stats = whiten(genome_stats)
+        else:
+            genome_stats = np_array(genome_stats)
 
         # cluster
-        self.logger.info('')
-        self.logger.info('  Partitioning genome into %d clusters.' % K)
-        _centroids, labels = kmeans2(genome_stats, K, iterations)
-        for k in range(K):
+        self.logger.info('  Partitioning genome into %d clusters.' % num_clusters)
+
+        bError = True
+        while bError:
+            try:
+                bError = False
+                _centroids, labels = kmeans2(genome_stats, num_clusters, iterations, minit='points', missing='raise')
+            except ClusterError:
+                bError = True
+
+        for k in range(num_clusters):
             self.logger.info('    Placed %d sequences in cluster %d.' % (sum(labels == k), (k + 1)))
 
         # write out clusters
         genome_id = remove_extension(genome_file)
-        for k in range(K):
+        for k in range(num_clusters):
             fout = open(os.path.join(output_dir, genome_id + '_c%d' % (k + 1) + '.fna'), 'w')
             for i in np_where(labels == k)[0]:
                 seq_id = seqs.keys()[i]

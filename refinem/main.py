@@ -401,7 +401,7 @@ class OptionsParser():
         """Cluster command"""
         self.logger.info('')
         self.logger.info('*******************************************************************************')
-        self.logger.info(' [RefineM - cluster] Partitioning genome into K distinct clusters.')
+        self.logger.info(' [RefineM - cluster] Partitioning bin into clusters.')
         self.logger.info('*******************************************************************************')
 
         check_file_exists(options.scaffold_stats_file)
@@ -413,8 +413,16 @@ class OptionsParser():
         scaffold_stats = ScaffoldStats()
         scaffold_stats.read(options.scaffold_stats_file)
 
-        cluster = Cluster()
-        cluster.run(scaffold_stats, options.K, options.iterations, options.genome_file, options.output_dir)
+        cluster = Cluster(options.cpus)
+        cluster.run(scaffold_stats,
+                    options.num_clusters,
+                    options.num_components,
+                    options.K,
+                    options.no_coverage,
+                    options.no_pca,
+                    options.iterations,
+                    options.genome_file,
+                    options.output_dir)
 
         self.logger.info('')
         self.logger.info('  Partitioned sequences written to: ' + options.output_dir)

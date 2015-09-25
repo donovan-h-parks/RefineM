@@ -26,7 +26,7 @@ from refinem.plots.mpld3_plugins import Tooltip
 
 
 class CovPercPlots(BasePlot):
-    """Histogram and scatterplot showing mean percent deviant of coverage profiles of scaffolds."""
+    """Histogram and scatterplot showing mean percent difference of coverage profiles of scaffolds."""
 
     def __init__(self, options):
         """Initialize."""
@@ -95,40 +95,40 @@ class CovPercPlots(BasePlot):
         cov_percs : iterable
           Coverage percentile values to mark on plot.
         """
-        # calculate percent deviant of coverage profiles for each scaffold
-        mean_deviations = []
+        # calculate percent difference of coverage profiles for each scaffold
+        mean_perc_diff = []
         for stats in genome_scaffold_stats.values():
 
-            mean_deviation = []
+            mean_perc_diff = []
             for cov_genome, cov_scaffold in itertools.izip(mean_coverage, stats.coverage):
                 if len(mean_coverage) >= 2:
-                    mean_deviation.append(abs(cov_scaffold - cov_genome) * 100 / cov_genome)
+                    mean_perc_diff.append(abs(cov_scaffold - cov_genome) * 100 / np.mean(cov_genome, cov_scaffold))
                 else:
-                    mean_deviation.append((cov_scaffold - cov_genome) * 100 / cov_genome)
+                    mean_perc_diff.append((cov_scaffold - cov_genome) * 100 / np.mean(cov_genome, cov_scaffold))
 
-            mean_deviations.append(np.mean(mean_deviation))
+            mean_perc_diff.append(np.mean(mean_perc_diff))
 
         # histogram plot
         if axes_hist:
-            axes_hist.hist(mean_deviations, bins=20, color=(0.5, 0.5, 0.5))
+            axes_hist.hist(mean_perc_diff, bins=20, color=(0.5, 0.5, 0.5))
             if len(mean_coverage) >= 2:
-                axes_hist.set_xlabel('absolute mean % deviation of coverage')
+                axes_hist.set_xlabel('absolute mean % difference of coverage')
             else:
-                axes_hist.set_xlabel('mean % deviation of coverage')
+                axes_hist.set_xlabel('mean % difference of coverage')
 
-            axes_hist.set_ylabel('# scaffolds (out of %d)' % len(mean_deviations))
+            axes_hist.set_ylabel('# scaffolds (out of %d)' % len(mean_perc_diff))
             self.prettify(axes_hist)
 
         # scatterplot
         if len(mean_coverage) >= 2:
-            xlabel = 'absolute mean %% deviation of coverage (mean coverage = %.1f)' % np.mean(mean_coverage)
+            xlabel = 'absolute mean %% difference of coverage (mean coverage = %.1f)' % np.mean(mean_coverage)
         else:
-            xlabel = 'mean %% deviation of coverage (mean coverage = %.1f)' % np.mean(mean_coverage)
+            xlabel = 'mean %% difference of coverage (mean coverage = %.1f)' % np.mean(mean_coverage)
         ylabel = 'Scaffold length (kbp)'
 
         scaffold_stats = {}
         for i, (scaffold_id, stats) in enumerate(genome_scaffold_stats.iteritems()):
-            scaffold_stats[scaffold_id] = (mean_deviations[i], stats.length / 1000.0)
+            scaffold_stats[scaffold_id] = (mean_perc_diff[i], stats.length / 1000.0)
 
         scatter, labels = self.scatter(axes_scatter,
                                          scaffold_stats,
