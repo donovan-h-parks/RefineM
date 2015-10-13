@@ -85,7 +85,7 @@ class Reference(object):
         Parameters
         ----------
         scaffold_gene_file : str
-            Fasta file of genes on scaffolds in amino acid space
+            Fasta file of genes on scaffolds in amino acid space.
         stat_file : str
             File with statistics for individual scaffolds.
         ref_genome_gene_files : list of str
@@ -198,3 +198,33 @@ class Reference(object):
         fout.close()
 
         return reference_out
+
+    def homology_check(self, reference_file, min_genes, required_perc_genes):
+        """Determine genes with homology to reference genomes.
+
+        Parameters
+        ----------
+        reference_file : str
+            Output file from running Reference.run().
+        min_genes : int
+            File with statistics for individual scaffolds.
+        required_perc_genes : float
+            Percentage of genes with homology to consider scaffold compatibility.
+        """
+
+        putative_homologs = defaultdict(list)
+        with open(reference_file) as f:
+            headers = [x.strip() for x in f.readline().split('\t')]
+
+            no_genes_index = headers.index('# genes')
+            perc_genes_index = headers.index('% genes')
+
+            for line in f:
+                line_split = line.split('\t')
+                no_genes = int(line_split[no_genes_index])
+                perc_genes = float(line_split[perc_genes_index])
+
+                if no_genes >= min_genes and perc_genes >= required_perc_genes:
+                    putative_homologs[line_split[0]] = [no_genes, perc_genes]
+
+        return putative_homologs

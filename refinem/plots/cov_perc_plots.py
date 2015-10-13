@@ -95,16 +95,19 @@ class CovPercPlots(BasePlot):
         cov_percs : iterable
           Coverage percentile values to mark on plot.
         """
+
         # calculate percent difference of coverage profiles for each scaffold
         mean_perc_diffs = []
         for stats in genome_scaffold_stats.values():
 
             mean_perc_diff = []
             for cov_genome, cov_scaffold in itertools.izip(mean_coverage, stats.coverage):
-                if len(mean_coverage) >= 2:
-                    mean_perc_diff.append(abs(cov_scaffold - cov_genome) * 100 / np.mean([cov_genome, cov_scaffold]))
+                if cov_genome == 0:
+                    mean_perc_diff.append(0)
+                elif len(mean_coverage) >= 2:
+                    mean_perc_diff.append(abs(cov_scaffold - cov_genome) * 100 / cov_genome)
                 else:
-                    mean_perc_diff.append((cov_scaffold - cov_genome) * 100 / np.mean([cov_genome, cov_scaffold]))
+                    mean_perc_diff.append((cov_scaffold - cov_genome) * 100 / cov_genome)
 
             mean_perc_diffs.append(np.mean(mean_perc_diff))
 
@@ -112,18 +115,18 @@ class CovPercPlots(BasePlot):
         if axes_hist:
             axes_hist.hist(mean_perc_diffs, bins=20, color=(0.5, 0.5, 0.5))
             if len(mean_coverage) >= 2:
-                axes_hist.set_xlabel('absolute mean % difference of coverage')
+                axes_hist.set_xlabel('absolute mean percentage error of coverage')
             else:
-                axes_hist.set_xlabel('mean % difference of coverage')
+                axes_hist.set_xlabel('mean percentage error of coverage')
 
             axes_hist.set_ylabel('# scaffolds (out of %d)' % len(mean_perc_diffs))
             self.prettify(axes_hist)
 
         # scatterplot
         if len(mean_coverage) >= 2:
-            xlabel = 'absolute mean %% difference of coverage (mean coverage = %.1f)' % np.mean(mean_coverage)
+            xlabel = 'absolute mean percentage error of coverage (mean coverage = %.1f)' % np.mean(mean_coverage)
         else:
-            xlabel = 'mean %% difference of coverage (mean coverage = %.1f)' % np.mean(mean_coverage)
+            xlabel = 'mean percentage error of coverage (mean coverage = %.1f)' % np.mean(mean_coverage)
         ylabel = 'Scaffold length (kbp)'
 
         scaffold_stats = {}

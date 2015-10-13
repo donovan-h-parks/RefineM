@@ -30,7 +30,7 @@ from biolib.genomic_signature import GenomicSignature
 
 
 class Outliers():
-    """Identify scaffolds with divergent genomic characteristics."""
+    """Identify scaffolds with divergent or compatible genomic characteristics."""
 
     def __init__(self):
         """Initialization."""
@@ -78,25 +78,25 @@ class Outliers():
 
         Outliers are identified independently based on GC content,
         tetranucleotide signatures, coverage profile correlation, and
-        mean percent deviation of coverage profile. The coverage correlation
+        mean absolute percent error of coverage profile. The coverage correlation
         check is ignored if the coverage profile consists of a single value.
 
         Parameters
         ----------
         scaffold_stats : ScaffoldStats
-            Statistics for individual scaffolds
+            Statistics for individual scaffolds.
         genome_stats : GenomeStats
-            Staitsics for individual genomes.
-        gc_per : int
+            Statistics for individual genomes.
+        gc_per : int.
             Percentile for identifying GC outliers
         td_per : int
-            Percentile for identifying TD outliers
+            Percentile for identifying TD outliers.
         cov_corr : int
-            Correlation for identifying divergent coverage profiles
+            Correlation for identifying divergent coverage profiles.
         cov_perc : int
-            Mean percent deviation for identifying divergent coverage profiles
+            Mean absolute percent error for identifying divergent coverage profiles.
         report_type : str
-            Report scaffolds that are outliers in 'all' or 'any' distribution
+            Report scaffolds that are outliers in 'all' or 'any' distribution.
         output_file : str
             Name of output file.
         """
@@ -111,7 +111,7 @@ class Outliers():
         fout.write('Scaffold id\tGenome id\tScaffold length (bp)\tOutlying distributions')
         fout.write('\tScaffold GC\tMean genome GC\tLower GC bound (%s%%)\tUpper GC bound (%s%%)' % (gc_per, gc_per))
         fout.write('\tScaffold TD\tMean genome TD\tUpper TD bound (%s%%)' % td_per)
-        fout.write('\tMean scaffold coverage\tMean genome coverage\tCoverage correlation\tMean coverage deviation\n')
+        fout.write('\tMean scaffold coverage\tMean genome coverage\tCoverage correlation\tMean coverage error\n')
 
         genomic_signature = GenomicSignature(0)
 
@@ -168,18 +168,140 @@ class Outliers():
                 mean_cp = []
                 for cov_genome, cov_scaffold in itertools.izip(gs.mean_coverage, stats.coverage):
                     if cov_genome >= self.min_required_coverage:
-                        mean_cp.append(abs(cov_genome - cov_scaffold) * 100 / np_mean([cov_genome, cov_scaffold]))
+                        mean_cp.append(abs(cov_scaffold - cov_genome) * 100.0 / cov_genome)
 
                 mean_cp = np_mean(mean_cp)
                 if mean_cp > cov_perc:
                     outlying_dists.append('COV_PERC')
 
                 # report outliers
-                if (report_type == 'any' and len(outlying_dists) >= 1) or (report_type == 'all' and len(outlying_dists) == 2):
+                if (report_type == 'any' and len(outlying_dists) >= 1) or (report_type == 'all' and len(outlying_dists) >= 3):
                     fout.write('%s\t%s\t%s\t%s' % (scaffold_id, genome_id, stats.length, ','.join(outlying_dists)))
                     fout.write('\t%.2f\t%.2f\t%.2f\t%.2f' % (stats.gc, gs.mean_gc, gs.mean_gc + gc_lower_bound * 100, gs.mean_gc + gc_upper_bound * 100))
                     fout.write('\t%.3f\t%.3f\t%.3f' % (delta_td, gs.mean_td, td_bound))
                     fout.write('\t%.2f\t%.2f\t%.2f\t%.2f' % (np_mean(stats.coverage), np_mean(gs.mean_coverage), corr_r, mean_cp))
+                    fout.write('\n')
+
+        sys.stdout.write('\n')
+        fout.close()
+
+    def compatible(self, scaffolds_of_interest,
+                        scaffold_stats,
+                        genome_stats,
+                        gc_per, td_per,
+                        cov_corr, cov_perc,
+                        report_type, output_file):
+        """Identify scaffolds with compatible genomic characteristics.
+
+        Compatible scaffolds are identified based on GC content,
+        tetranucleotide signatures, coverage profile correlation, and
+        mean absolute percent error of coverage profile. The coverage correlation
+        check is ignored if the coverage profile consists of a single value.
+
+        Parameters
+        ----------
+        scaffolds_of_interest : d[scaffold_id] -> [no. genes, perc. genes with homology]
+            Scaffolds to consider for compatibility.
+        scaffold_stats : ScaffoldStats
+            Statistics for individual scaffolds to check.
+        genome_stats : GenomeStats
+            Statistics for individual genomes.
+        gc_per : int
+            Percentile for identifying GC outliers.
+        td_per : int
+            Percentile for identifying TD outliers.
+        cov_corr : int
+            Correlation for identifying divergent coverage profiles.
+        cov_perc : int
+            Mean absolute percent error for identifying divergent coverage profiles.
+        report_type : str
+            Report scaffolds that are outliers in 'all' or 'any' distribution.
+        output_file : str
+            Name of output file.
+        """
+
+        # read reference distributions from file
+        self.logger.info('')
+        self.logger.info('  Reading reference distributions.')
+        self.gc_dist = self._read_distribution('gc_dist')
+        self.td_dist = self._read_distribution('td_dist')
+
+        # identify compatible scaffolds in each genome
+        fout = open(output_file, 'w')
+        fout.write('Scaffold id\tGenome id\tScaffold length (bp)\tCompatible distributions')
+        fout.write('\tScaffold GC\tMean genome GC\tLower GC bound (%s%%)\tUpper GC bound (%s%%)' % (gc_per, gc_per))
+        fout.write('\tScaffold TD\tMean genome TD\tUpper TD bound (%s%%)' % td_per)
+        fout.write('\tMean scaffold coverage\tMean genome coverage\tCoverage correlation\tMean coverage error')
+        fout.write('\t# genes\t% genes with homology\n')
+
+        genomic_signature = GenomicSignature(0)
+
+        self.logger.info('  Identifying scaffolds compatible with bins.')
+        processed_scaffolds = 0
+        for scaffold_id, ss in scaffold_stats.stats.iteritems():
+            processed_scaffolds += 1
+            sys.stdout.write('    Processed %d of %d (%.1f%%) scaffolds.\r' % (processed_scaffolds,
+                                                                         len(scaffold_stats.stats),
+                                                                         processed_scaffolds * 100.0 / len(scaffold_stats.stats)))
+            sys.stdout.flush()
+
+            if scaffold_id not in scaffolds_of_interest:
+                continue
+
+            for genome_id, gs in genome_stats.iteritems():
+                # find keys into GC and TD distributions
+                # gc -> [mean GC][scaffold length][percentile]
+                # td -> [scaffold length][percentile]
+                closest_gc = find_nearest(self.gc_dist.keys(), gs.mean_gc / 100.0)
+                sample_seq_len = self.gc_dist[closest_gc].keys()[0]
+                d = self.gc_dist[closest_gc][sample_seq_len]
+                gc_lower_bound_key = find_nearest(d.keys(), (100 - gc_per) / 2.0)
+                gc_upper_bound_key = find_nearest(d.keys(), (100 + gc_per) / 2.0)
+
+                td_bound_key = find_nearest(self.td_dist[self.td_dist.keys()[0]].keys(), td_per)
+
+                # find GC and TD bounds
+                closest_seq_len = find_nearest(self.gc_dist[closest_gc].keys(), ss.length)
+                gc_lower_bound = self.gc_dist[closest_gc][closest_seq_len][gc_lower_bound_key]
+                gc_upper_bound = self.gc_dist[closest_gc][closest_seq_len][gc_upper_bound_key]
+
+                closest_seq_len = find_nearest(self.td_dist.keys(), ss.length)
+                td_bound = self.td_dist[closest_seq_len][td_bound_key]
+
+                # find changes from mean
+                delta_gc = (ss.gc - gs.mean_gc) / 100.0
+                delta_td = genomic_signature.manhattan(ss.signature, gs.mean_signature)
+
+                # determine if scaffold compatible
+                compatible_dists = []
+                if delta_gc >= gc_lower_bound and delta_gc <= gc_upper_bound:
+                    compatible_dists.append('GC')
+
+                if delta_td <= td_bound:
+                    compatible_dists.append('TD')
+
+                corr_r = 1.0
+                if len(gs.mean_coverage) > 1:
+                    corr_r, _corr_p = pearsonr(gs.mean_coverage, ss.coverage)
+                    if  corr_r >= cov_corr:
+                        compatible_dists.append('COV_CORR')
+
+                mean_cp = []
+                for cov_genome, cov_scaffold in itertools.izip(gs.mean_coverage, ss.coverage):
+                    if cov_genome >= self.min_required_coverage:
+                        mean_cp.append(abs(cov_genome - cov_scaffold) * 100.0 / cov_genome)
+
+                mean_cp = np_mean(mean_cp)
+                if mean_cp <= cov_perc:
+                    compatible_dists.append('COV_PERC')
+
+                # report compatible scaffolds
+                if (report_type == 'any' and len(compatible_dists) >= 1) or (report_type == 'all' and len(compatible_dists) >= 3):
+                    fout.write('%s\t%s\t%s\t%s' % (scaffold_id, genome_id, ss.length, ','.join(compatible_dists)))
+                    fout.write('\t%.2f\t%.2f\t%.2f\t%.2f' % (ss.gc, gs.mean_gc, gs.mean_gc + gc_lower_bound * 100, gs.mean_gc + gc_upper_bound * 100))
+                    fout.write('\t%.3f\t%.3f\t%.3f' % (delta_td, gs.mean_td, td_bound))
+                    fout.write('\t%.2f\t%.2f\t%.2f\t%.2f' % (np_mean(ss.coverage), np_mean(gs.mean_coverage), corr_r, mean_cp))
+                    fout.write('\t%d\t%.1f' % (scaffolds_of_interest[scaffold_id][0], scaffolds_of_interest[scaffold_id][1]))
                     fout.write('\n')
 
         sys.stdout.write('\n')

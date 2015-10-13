@@ -42,16 +42,7 @@ class ReadLoader:
         self.min_align_per = min_align_per
         self.max_edit_dist_per = max_edit_dist_per
 
-        self.num_reads = 0
-        self.num_mapped_reads = 0
-        self.num_duplicates = 0
-        self.num_secondary = 0
-        self.num_failed_qc = 0
-        self.num_failed_align_len = 0
-        self.num_failed_edit_dist = 0
-        self.num_failed_proper_pair = 0
 
-        self.coverage = 0
 
     def __call__(self, read):
         self.num_reads += 1
@@ -218,15 +209,48 @@ class Coverage():
             bamfile = pysam.Samfile(bam_file, 'rb')
 
             for seq_id, seq_len in zip(seq_ids, seq_lens):
-                readLoader = ReadLoader(all_reads, min_align_per, max_edit_dist_per)
-                bamfile.fetch(seq_id, 0, seq_len, callback=readLoader)
+                num_reads = 0
+                num_mapped_reads = 0
+                num_duplicates = 0
+                num_secondary = 0
+                num_failed_qc = 0
+                num_failed_align_len = 0
+                num_failed_edit_dist = 0
+                num_failed_proper_pair = 0
+                coverage = 0
 
-                coverage = float(readLoader.coverage) / seq_len
+                for read in bamfile.fetch(seq_id, 0, seq_len):
+                    num_reads += 1
 
-                queue_out.put((seq_id, seq_len, coverage, readLoader.num_reads,
-                                readLoader.num_duplicates, readLoader.num_secondary, readLoader.num_failed_qc,
-                                readLoader.num_failed_align_len, readLoader.num_failed_edit_dist,
-                                readLoader.num_failed_proper_pair, readLoader.num_mapped_reads))
+                    if read.is_unmapped:
+                        pass
+                    elif read.is_duplicate:
+                        num_duplicates += 1
+                    elif read.is_secondary or read.is_supplementary:
+                        num_secondary += 1
+                    elif read.is_qcfail:
+                        num_failed_qc += 1
+                    elif read.query_alignment_length < min_align_per * read.query_length:
+                        num_failed_align_len += 1
+                    elif read.get_tag('NM') > max_edit_dist_per * read.query_length:
+                        num_failed_edit_dist += 1
+                    elif not all_reads and not read.is_proper_pair:
+                        num_failed_proper_pair += 1
+                    else:
+                        num_mapped_reads += 1
+
+                        # Note: the alignment length (query_alignment_length) is used instead of the
+                        # read length (query_length) as this bring the calculated coverage
+                        # in line with 'samtools depth' (at least when the min
+                        # alignment length and edit distance thresholds are zero)
+                        coverage += read.query_alignment_length
+
+                coverage = float(coverage) / seq_len
+
+                queue_out.put((seq_id, seq_len, coverage, num_reads,
+                                num_duplicates, num_secondary, num_failed_qc,
+                                num_failed_align_len, num_failed_edit_dist,
+                                num_failed_proper_pair, num_mapped_reads))
 
             bamfile.close()
 

@@ -72,7 +72,7 @@ def print_help():
 
     Improve completeness:
      reference      -> Identify scaffolds with similarity to specific reference genome(s)
-     compatible     -> [not implemented] Identify scaffolds with compatible GC, coverage, and tetranucleotide signatures
+     compatible     -> Identify scaffolds with compatible GC, coverage, and tetranucleotide signatures
      merge          -> [not implemented] Identify partial genomes which should be merged together (requires CheckM)
 
     Modify genome:
@@ -150,7 +150,7 @@ if __name__ == '__main__':
     outlier_parser.add_argument('--gc_perc', help='percentile for identify scaffolds with divergent GC content', type=int, choices=xrange(0, 101), default=95, metavar='int')
     outlier_parser.add_argument('--td_perc', help='percentile for identify scaffolds with divergent tetranucleotide signatures', type=int, choices=xrange(0, 101), default=95, metavar='int')
     outlier_parser.add_argument('--cov_corr', help='correlation for identifying scaffolds with divergent coverage profiles', type=float, default=0.8)
-    outlier_parser.add_argument('--cov_perc', help='mean percent difference for identifying scaffolds with divergent coverage profiles', type=int, choices=xrange(0, 301), default=50, metavar='int')
+    outlier_parser.add_argument('--cov_perc', help='mean absolute percent error for identifying scaffolds with divergent coverage profiles', type=int, choices=xrange(0, 1001), default=50, metavar='int')
     outlier_parser.add_argument('-r', '--report_type', help="report sequences that are outliers in 'all' or 'any' reference distribution", choices=['any', 'all'], default='any')
     outlier_parser.add_argument('--individual_plots', action="store_true", default=False, help='create individual plots for each statistic')
     outlier_parser.add_argument('--image_type', default='png', choices=['eps', 'pdf', 'png', 'ps', 'svg'], help='desired image type')
@@ -177,7 +177,7 @@ if __name__ == '__main__':
     cluster_parser.add_argument('--no_pca', help="do not calculate PCA of genomic signature", action='store_true')
     cluster_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
 
-    # identify scaffolds with similarity to a set of reference genomes
+    # Identify scaffolds with similarity to a set of reference genomes
     reference_parser = subparsers.add_parser('reference',
                                         formatter_class=CustomHelpFormatter,
                                         description='Identify scaffolds with similarity to specific reference genome(s).')
@@ -191,6 +191,22 @@ if __name__ == '__main__':
     reference_parser.add_argument('-x', '--protein_ext', default='faa', help="extension of amino acid gene files (other files in directory are ignored)")
     reference_parser.add_argument('--tmpdir', action=ChangeTempAction, default=tempfile.gettempdir(), help="specify alternative directory for temporary files")
     reference_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
+
+    # Identify scaffolds with compatible GC, coverage, and tetranucleotide signatures
+    compatible_parser = subparsers.add_parser('compatible',
+                                        formatter_class=CustomHelpFormatter,
+                                        description='Identify scaffolds with compatible GC, coverage, and tetranucleotide signatures.')
+    compatible_parser.add_argument('reference_file', help="file with scaffold statistics produced by reference command")
+    compatible_parser.add_argument('scaffold_stats_file', help="file with statistics for each scaffold")
+    compatible_parser.add_argument('output_dir', help="output directory")
+
+    compatible_parser.add_argument('--min_genes', help="minimum required genes to consider for compatibility", type=int, default=3)
+    compatible_parser.add_argument('--perc_genes', help="percentage of genes with homology to reference genomes to consider scaffold compatible", type=int, choices=xrange(0, 101), default=50, metavar='int')
+    compatible_parser.add_argument('--gc_perc', help='percentile for identify scaffolds with compatible GC content', type=int, choices=xrange(0, 101), default=95, metavar='int')
+    compatible_parser.add_argument('--td_perc', help='percentile for identify scaffolds with compatible tetranucleotide signatures', type=int, choices=xrange(0, 101), default=95, metavar='int')
+    compatible_parser.add_argument('--cov_corr', help='correlation for identifying scaffolds with compatible coverage profiles', type=float, default=0.8)
+    compatible_parser.add_argument('--cov_perc', help='mean absolute percent error for identifying scaffolds with compatible coverage profiles', type=int, choices=xrange(0, 1001), default=50, metavar='int')
+    compatible_parser.add_argument('-r', '--report_type', help="report sequences that are compatible in 'all' or 'any' reference distribution", choices=['any', 'all'], default='all')
 
     # Modify a bin
     modify_parser = subparsers.add_parser('modify',

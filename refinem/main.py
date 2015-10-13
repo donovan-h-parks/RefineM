@@ -458,6 +458,45 @@ class OptionsParser():
 
         self.time_keeper.print_time_stamp()
 
+    def compatible(self, options):
+        """Compatible command"""
+        self.logger.info('')
+        self.logger.info('*******************************************************************************')
+        self.logger.info('[RefineM - compatible] Identify scaffolds with compatible genomic statistics.')
+        self.logger.info('*******************************************************************************')
+
+        check_file_exists(options.reference_file)
+        check_file_exists(options.scaffold_stats_file)
+        make_sure_path_exists(options.output_dir)
+
+        # read scaffold statistics and calculate genome stats
+        self.logger.info('')
+        self.logger.info('  Reading scaffold statistics.')
+        scaffold_stats = ScaffoldStats()
+        scaffold_stats.read(options.scaffold_stats_file)
+
+        genome_stats = GenomeStats()
+        genome_stats = genome_stats.run(scaffold_stats)
+
+        # identify putative homologs to reference genomes
+        reference = Reference(1, None)
+        putative_homologs = reference.homology_check(options.reference_file,
+                                                         options.min_genes,
+                                                         float(options.perc_genes))
+
+        # identify scaffolds compatible with bins
+        outliers = Outliers()
+        output_file = os.path.join(options.output_dir, 'compatible.tsv')
+        outliers.compatible(putative_homologs, scaffold_stats, genome_stats,
+                                      options.gc_perc, options.td_perc,
+                                      options.cov_corr, options.cov_perc,
+                                      options.report_type, output_file)
+
+        self.logger.info('')
+        self.logger.info('  Results written to: ' + output_file)
+
+        self.time_keeper.print_time_stamp()
+
     def modify(self, options):
         """Modify command"""
         self.logger.info('')
@@ -643,6 +682,8 @@ class OptionsParser():
             self.cluster(options)
         elif(options.subparser_name == 'reference'):
             self.reference(options)
+        elif(options.subparser_name == 'compatible'):
+            self.compatible(options)
         elif(options.subparser_name == 'unique'):
             self.unique(options)
         elif(options.subparser_name == 'bin_compare'):
