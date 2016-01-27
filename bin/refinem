@@ -129,7 +129,7 @@ if __name__ == '__main__':
     gene_profile_parser = subparsers.add_parser('gene_profile',
                                         formatter_class=CustomHelpFormatter,
                                         description='Generate taxonomic profile of genes across scaffolds within a genome.')
-    gene_profile_parser.add_argument('genome_prot_dir', help="directory containing  amino acid genes for each genome")
+    gene_profile_parser.add_argument('genome_prot_dir', help="directory containing amino acid genes for each genome")
     gene_profile_parser.add_argument('scaffold_stats_file', help="file with statistics for each scaffold")
     gene_profile_parser.add_argument('db_file', help="database of reference genomes")
     gene_profile_parser.add_argument('taxonomy_file', help="taxonomic assignment of each reference genomes")
@@ -218,6 +218,8 @@ if __name__ == '__main__':
     modify_parser.add_argument('-a', '--add', action='append', help="ID of scaffold to add to genome (may specify multiple times)")
     modify_parser.add_argument('-r', '--remove', action='append', help="ID of scaffold to remove from bin (may specify multiple times)")
     modify_parser.add_argument('-o', '--outlier_file', help="remove all scaffolds identified as outliers (see outlier command)")
+    modify_parser.add_argument('-c', '--compatible_file', help="add all scaffolds identified as compatible (see compatible command)")
+    modify_parser.add_argument('-u', '--unique_only', help="only consider scaffolds specified exactly once in the compatible file (see compatible command)")
 
     # Ensure scaffolds are assigned to a single bin
     unique_parser = subparsers.add_parser('unique',

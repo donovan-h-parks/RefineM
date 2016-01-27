@@ -50,12 +50,6 @@ from biolib.misc.time_keeper import TimeKeeper
 from biolib.external.execute import check_dependencies
 
 
-"""
-To do:
-1. Need to consider when a command should take called genes instead of nucleotide sequences.
-"""
-
-
 class OptionsParser():
     def __init__(self):
         """Initialization"""
@@ -506,12 +500,16 @@ class OptionsParser():
 
         make_sure_path_exists(os.path.dirname(options.output_genome))
 
-        if not (options.add or options.remove or options.outlier_file):
+        if not (options.add or options.remove or options.outlier_file or options.compatible_file):
             self.logger.warning('  [Warning] No modification to bin requested.\n')
             sys.exit()
 
-        if (options.add or options.remove) and options.outlier_file:
-            self.logger.warning("  [Warning] The 'outlier_file' option cannot be specified with 'add' or 'remove'.\n")
+        if (options.add or options.remove) and (options.outlier_file or options.compatible_file):
+            self.logger.warning("  [Warning] The 'outlier_file' and 'compatible_file' options cannot be specified with 'add' or 'remove'.\n")
+            sys.exit()
+
+        if options.outlier_file and options.compatible_file:
+            self.logger.warning("  [Warning] The 'outlier_file' and 'compatible_file' options cannot be specified at the same time.\n")
             sys.exit()
 
         failed_to_add = []
@@ -524,7 +522,13 @@ class OptionsParser():
                                                                options.output_genome)
         elif options.outlier_file:
             outliers = Outliers()
-            outliers.remove(options.genome_file, options.outlier_file, options.output_genome)
+            outliers.remove_outliers(options.genome_file, options.outlier_file, options.output_genome)
+        elif options.compatible_file:
+            outliers = Outliers()
+            if options.unique_only:
+                outliers.add_compatible_unique(options.scaffold_file, options.genome_file, options.compatible_file, options.output_genome)
+            else:
+                outliers.add_compatible_closest(options.scaffold_file, options.genome_file, options.compatible_file, options.output_genome)
 
         if failed_to_add:
             self.logger.warning('  [Warning] Failed to add the following sequence(s):')
@@ -558,13 +562,13 @@ class OptionsParser():
 
         # call genes in genomes
         prodigal = Prodigal(options.cpus)
-        prodigal.run(genome_files, False, None, False, options.output_dir)
+        prodigal.run(genome_files, options.output_dir)
         self.logger.info('  Genes in genomes written to: %s' % options.output_dir)
 
         # call genes in unbinned scaffolds
         if options.unbinned_file:
             unbinned_output_dir = os.path.join(options.output_dir, 'unbinned')
-            prodigal.run([options.unbinned_file], False, 11, True, unbinned_output_dir)
+            prodigal.run([options.unbinned_file], unbinned_output_dir, meta=True)
             self.logger.info('  Genes in unbinned scaffolds written to: %s' % unbinned_output_dir)
 
         self.time_keeper.print_time_stamp()

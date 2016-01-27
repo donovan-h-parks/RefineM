@@ -20,12 +20,13 @@ import sys
 import ast
 import itertools
 import logging
+from collections import defaultdict
 
 from scipy.stats import pearsonr
 from numpy import (mean as np_mean)
 
 import biolib.seq_io as seq_io
-from biolib.common import find_nearest, alphanumeric_sort
+from biolib.common import find_nearest, alphanumeric_sort, remove_extension
 from biolib.genomic_signature import GenomicSignature
 
 
@@ -39,7 +40,7 @@ class Outliers():
 
         self.min_required_coverage = 0.01
 
-    def remove(self, genome_file, outlier_file, out_genome):
+    def remove_outliers(self, genome_file, outlier_file, out_genome):
         """Remove sequences specified as outliers.
 
         Any scaffolds lists in the first column of
@@ -66,6 +67,131 @@ class Outliers():
                 line_split = line.split('\t')
                 scaffold_id = line_split[0]
                 genome_seqs.pop(scaffold_id, None)
+
+        # save modified bin
+        seq_io.write_fasta(genome_seqs, out_genome)
+
+    def add_compatible_unique(self, scaffold_file, genome_file, compatible_file, out_genome):
+        """Add sequences specified as compatible.
+
+        Only sequences specified exactly once in the
+        compatibility file are added.
+
+        Parameters
+        ----------
+        scaffold_file : str
+            Fasta file containing scaffolds to add.
+        genome_file : str
+            Fasta file of binned scaffolds.
+        compatible_file : str
+            File specifying compatible scaffolds.
+        out_genome : str
+            Name of output genome.
+        """
+
+        cur_bin_id = remove_extension(genome_file)
+
+        # determine scaffolds compatible with genome
+        scaffold_ids = []
+        bin_ids = {}
+        with open(compatible_file) as f:
+            f.readline()
+
+            for line in f:
+                line_split = line.split('\t')
+                scaffold_id = line_split[0]
+                bin_id = line_split[1].strip()
+
+                scaffold_ids.append(scaffold_id)
+                bin_ids[scaffold_id] = bin_id
+
+        compatible_scaffolds = set()
+        for scaffold_id, bin_id in bin_ids.iteritems():
+            if scaffold_ids.count(scaffold_id) == 1 and bin_id == cur_bin_id:
+                compatible_scaffolds.add(scaffold_id)
+
+        # add compatible sequences to genome
+        genome_seqs = seq_io.read(genome_file)
+        for seq_id, seq in seq_io.read_seq(scaffold_file):
+            if seq_id in compatible_scaffolds:
+                genome_seqs[seq_id] = seq
+
+        # save modified bin
+        seq_io.write_fasta(genome_seqs, out_genome)
+
+    def add_compatible_closest(self, scaffold_file, genome_file, compatible_file, out_genome):
+        """Add sequences specified as compatible.
+
+        A sequences is added to a bin if and only if it is
+        closest to that bin in GC, tetranuclotide, and
+        coverage space.
+
+        Parameters
+        ----------
+        scaffold_file : str
+            Fasta file containing scaffolds to add.
+        genome_file : str
+            Fasta file of binned scaffolds.
+        compatible_file : str
+            File specifying compatible scaffolds.
+        out_genome : str
+            Name of output genome.
+        """
+
+        cur_bin_id = remove_extension(genome_file)
+
+        # determine statistics for each potentially compatible scaffold
+        scaffold_ids = defaultdict(dict)
+        with open(compatible_file) as f:
+            headers = [x.strip() for x in f.readline().split('\t')]
+            scaffold_gc_index = headers.index('Scaffold GC')
+            genome_gc_index = headers.index('Mean genome GC')
+            td_dist_index = headers.index('Scaffold TD')
+            scaffold_cov_index = headers.index('Mean scaffold coverage')
+            genome_cov_index = headers.index('Mean genome coverage')
+
+            for line in f:
+                line_split = line.split('\t')
+                scaffold_id = line_split[0]
+                bin_id = line_split[1].strip()
+
+                scaffold_gc = float(line_split[scaffold_gc_index])
+                genome_gc = float(line_split[genome_gc_index])
+                gc_dist = abs(scaffold_gc - genome_gc)
+
+                td_dist = float(line_split[td_dist_index])
+
+                scaffold_cov = float(line_split[scaffold_cov_index])
+                genome_cov = float(line_split[genome_cov_index])
+                cov_dist = abs(scaffold_cov - genome_cov)
+
+                scaffold_ids[scaffold_id][bin_id] = [gc_dist, td_dist, cov_dist]
+
+        # determine scaffolds that are closest to a single bin
+        # in terms of GC, tetranucleotide distance, and coverage
+        compatible_scaffolds = set()
+        for scaffold_id, bin_stats in scaffold_ids.iteritems():
+            best_gc = [1e9, None]
+            best_td = [1e9, None]
+            best_cov = [1e9, None]
+            for bin_id, stats in bin_stats.iteritems():
+                gc, td, cov = stats
+                if gc < best_gc[0]:
+                    best_gc = [gc, bin_id]
+                if td < best_td[0]:
+                    best_td = [td, bin_id]
+                if cov < best_cov[0]:
+                    best_cov = [cov, bin_id]
+
+            # check if scaffold is closest to a single bin
+            if (best_gc[1] == best_td[1] == best_cov[1]) and best_gc[1] == cur_bin_id:
+                compatible_scaffolds.add(scaffold_id)
+
+        # add compatible sequences to genome
+        genome_seqs = seq_io.read(genome_file)
+        for seq_id, seq in seq_io.read_seq(scaffold_file):
+            if seq_id in compatible_scaffolds:
+                genome_seqs[seq_id] = seq
 
         # save modified bin
         seq_io.write_fasta(genome_seqs, out_genome)
@@ -170,9 +296,15 @@ class Outliers():
                     if cov_genome >= self.min_required_coverage:
                         mean_cp.append(abs(cov_scaffold - cov_genome) * 100.0 / cov_genome)
 
-                mean_cp = np_mean(mean_cp)
-                if mean_cp > cov_perc:
+                if len(mean_cp) == 0:
+                    # genome has zero coverage which is general
+                    # will indicate something is wrong
+                    mean_cp = -1
                     outlying_dists.append('COV_PERC')
+                else:
+                    mean_cp = np_mean(mean_cp)
+                    if mean_cp > cov_perc:
+                        outlying_dists.append('COV_PERC')
 
                 # report outliers
                 if (report_type == 'any' and len(outlying_dists) >= 1) or (report_type == 'all' and len(outlying_dists) >= 3):
