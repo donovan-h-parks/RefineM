@@ -275,11 +275,16 @@ class OptionsParser():
 
         highlight_scaffolds_ids = {}
         if options.highlight_file:
-            highlight_scaffolds_ids = {line.split('\t')[0].strip() for line in open(options.highlight_file)}
+            for line in open(options.highlight_file):
+                line_split = line.strip().split('\t')
+                if len(line_split) > 1:
+                    highlight_scaffolds_ids[line_split[0]] = [float(x.strip()) / 255.0 for x in line_split[1].split(',')]
+                else:
+                    highlight_scaffolds_ids[line_split[0]] = [1.0, 0, 0]
 
         link_scaffold_ids = []
         if options.links_file:
-            link_scaffold_ids = {line.strip().split('\t') for line in open(options.links_file)}
+            link_scaffold_ids.append(line.strip().split('\t') for line in open(options.links_file))
 
         # create plots
         genomes_processed = 0
