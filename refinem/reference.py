@@ -1,5 +1,4 @@
 ###############################################################################
-###############################################################################
 #                                                                             #
 #    This program is free software: you can redistribute it and/or modify     #
 #    it under the terms of the GNU General Public License as published by     #
@@ -57,7 +56,8 @@ class Reference(object):
         output_dir : str
             Directory to store results.
         """
-        self.logger = logging.getLogger()
+        
+        self.logger = logging.getLogger('timestamp')
 
         self.cpus = cpus
         self.output_dir = output_dir
@@ -79,7 +79,7 @@ class Reference(object):
 
         return hits_to_ref
 
-    def run(self, scaffold_gene_file, stat_file, ref_genome_gene_files, db_file, evalue, per_identity,):
+    def run(self, scaffold_gene_file, stat_file, ref_genome_gene_files, db_file, evalue, per_identity, per_aln_len):
         """Create taxonomic profiles for a set of genomes.
 
         Parameters
@@ -93,20 +93,20 @@ class Reference(object):
         db_file : str
             Database of competing reference genes.
         evalue : float
-            E-value threshold used by blast.
-        per_identity: float
-            Percent identity threshold used by blast.
+            E-value threshold of valid hits.
+        per_identity : float
+            Percent identity threshold of valid hits [0,100].
+        per_aln_len : float
+            Percent query coverage of valid hits [0, 100].
         """
 
         # read statistics file
-        self.logger.info('')
-        self.logger.info('  Reading scaffold statistics.')
+        self.logger.info('Reading scaffold statistics.')
         scaffold_stats = ScaffoldStats()
         scaffold_stats.read(stat_file)
 
         # perform homology searches
-        self.logger.info('')
-        self.logger.info('  Creating diamond database for reference genomes.')
+        self.logger.info('Creating diamond database for reference genomes.')
         ref_gene_file = os.path.join(self.output_dir, 'ref_genes.faa')
         concatenate_gene_files(ref_genome_gene_files, ref_gene_file)
 
@@ -114,18 +114,18 @@ class Reference(object):
         ref_diamond_db = os.path.join(self.output_dir, 'ref_genes')
         diamond.make_database(ref_gene_file, ref_diamond_db)
 
-        self.logger.info('  Identifying homologs within reference genomes of interest (be patient!).')
+        self.logger.info('Identifying homologs within reference genomes of interest (be patient!).')
         self.diamond_dir = os.path.join(self.output_dir, 'diamond')
         make_sure_path_exists(self.diamond_dir)
         hits_ref_genomes_daa = os.path.join(self.diamond_dir, 'ref_hits')
-        diamond.blastp(scaffold_gene_file, ref_diamond_db, evalue, per_identity, 1, hits_ref_genomes_daa)
+        diamond.blastp(scaffold_gene_file, ref_diamond_db, evalue, per_identity, per_aln_len, 1, hits_ref_genomes_daa)
 
         hits_ref_genomes = os.path.join(self.diamond_dir, 'ref_hits.tsv')
         diamond.view(hits_ref_genomes_daa + '.daa', hits_ref_genomes)
 
-        self.logger.info('  Identifying homologs within competing reference genomes (be patient!).')
+        self.logger.info('Identifying homologs within competing reference genomes (be patient!).')
         hits_comp_ref_genomes_daa = os.path.join(self.diamond_dir, 'competing_ref_hits')
-        diamond.blastp(scaffold_gene_file, db_file, evalue, per_identity, 1, hits_comp_ref_genomes_daa)
+        diamond.blastp(scaffold_gene_file, db_file, evalue, per_identity, per_aln_len, 1, hits_comp_ref_genomes_daa)
 
         hits_comp_ref_genomes = os.path.join(self.diamond_dir, 'competing_ref_hits.tsv')
         diamond.view(hits_comp_ref_genomes_daa + '.daa', hits_comp_ref_genomes)

@@ -44,7 +44,7 @@ class Tetranucleotide(object):
         cpus : int
             Number of cpus to use.
         """
-        self.logger = logging.getLogger()
+        self.logger = logging.getLogger('timestamp')
 
         self.cpus = cpus
 
@@ -123,7 +123,10 @@ class Tetranucleotide(object):
             String indicating progress of data processing.
         """
 
-        return '    Finished processing %d of %d (%.2f%%) sequences.' % (processed_items, total_items, float(processed_items) * 100 / total_items)
+        if self.logger.is_silent:
+            return None
+        else:
+            return '  Finished processing %d of %d (%.2f%%) sequences.' % (processed_items, total_items, float(processed_items) * 100 / total_items)
 
     def run(self, seq_file):
         """Calculate tetranucleotide signatures of sequences.
@@ -139,7 +142,7 @@ class Tetranucleotide(object):
             Count of each kmer.
         """
 
-        self.logger.info('  Calculating tetranucleotide signature for each sequence:')
+        self.logger.info('Calculating tetranucleotide signature for each sequence:')
 
         parallel = Parallel(self.cpus)
         seq_signatures = parallel.run_seqs_file(self._producer, self._consumer, seq_file, self._progress)

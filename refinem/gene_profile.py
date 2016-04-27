@@ -83,7 +83,8 @@ class GeneProfile(object):
         output_dir : str
             Directory to store results.
         """
-        self.logger = logging.getLogger()
+        
+        self.logger = logging.getLogger('timestamp')
 
         self.cpus = cpus
         self.output_dir = output_dir
@@ -154,7 +155,14 @@ class GeneProfile(object):
 
         fout.close()
 
-    def run(self, gene_files, stat_file, db_file, taxonomy_file, percent_to_classify, evalue, per_identity):
+    def run(self, gene_files, 
+                    stat_file, 
+                    db_file, 
+                    taxonomy_file, 
+                    percent_to_classify, 
+                    evalue, 
+                    per_identity, 
+                    per_aln_len):
         """Create taxonomic profiles for a set of genomes.
 
         Parameters
@@ -173,16 +181,17 @@ class GeneProfile(object):
             E-value threshold used to identify homologs.
         per_identity: float
             Percent identity threshold used to identify homologs [0, 100].
+        per_aln_len : float
+            Percent coverage of query sequence used to identify homologs [0, 100].
         """
 
         # read statistics file
-        self.logger.info('')
-        self.logger.info('  Reading scaffold statistics.')
+        self.logger.info('Reading scaffold statistics.')
         scaffold_stats = ScaffoldStats()
         scaffold_stats.read(stat_file)
 
         # concatenate gene files
-        self.logger.info('  Appending genome identifiers to all gene identifiers.')
+        self.logger.info('Appending genome identifiers to all gene identifiers.')
         diamond_output_dir = os.path.join(self.output_dir, 'diamond')
         make_sure_path_exists(diamond_output_dir)
 
@@ -190,13 +199,12 @@ class GeneProfile(object):
         concatenate_gene_files(gene_files, gene_file)
 
         # read taxonomy file
-        self.logger.info('')
-        self.logger.info('  Reading taxonomic assignment of reference genomes.')
+        self.logger.info('Reading taxonomic assignment of reference genomes.')
 
         t = Taxonomy()
         taxonomy = t.read(taxonomy_file)
         if not t.validate(taxonomy, check_prefixes=True, check_ranks=True, check_hierarchy=False, check_species=False, report_errors=True):
-            self.logger.error('[Error]  Invalid taxonomy file.')
+            self.logger.error('Invalid taxonomy file.')
             sys.exit()
 
         # record length and number of genes in each scaffold
@@ -211,24 +219,21 @@ class GeneProfile(object):
                 self.profiles[genome_id].coding_bases[scaffold_id] += len(seq) * 3  # length in nucleotide space
 
         # run diamond and create taxonomic profile for each genome
-        self.logger.info('')
-        self.logger.info('  Running diamond blastp with %d processes (be patient!)' % self.cpus)
+        self.logger.info('Running diamond blastp with %d processes (be patient!)' % self.cpus)
 
         diamond = Diamond(self.cpus)
         diamond_daa_out = os.path.join(diamond_output_dir, 'diamond_hits')
-        diamond.blastp(gene_file, db_file, evalue, per_identity, 1, diamond_daa_out)
-
+        diamond.blastp(gene_file, db_file, evalue, per_identity, per_aln_len, 1, diamond_daa_out)
+   
         diamond_table_out = os.path.join(diamond_output_dir, 'diamond_hits.tsv')
         diamond.view(diamond_daa_out + '.daa', diamond_table_out)
 
         # create taxonomic profile for each genome
-        self.logger.info('')
-        self.logger.info('  Creating taxonomic profile for each genome.')
+        self.logger.info('Creating taxonomic profile for each genome.')
         self.taxonomic_profiles(diamond_table_out, taxonomy)
 
         # write out taxonomic profile
-        self.logger.info('')
-        self.logger.info('  Writing taxonomic profile for each genome.')
+        self.logger.info('Writing taxonomic profile for each genome.')
         report_dir = os.path.join(self.output_dir, 'bin_reports')
         make_sure_path_exists(report_dir)
         for aa_file in gene_files:
@@ -398,7 +403,8 @@ class Profile(object):
                 taxa = max(rank_hits[rank], key=lambda x: len(rank_hits[rank][x]))
                 count = len(rank_hits[rank][taxa])
 
-                if ((count >= self.percent_to_classify * self.genes_in_scaffold[seq_id])
+                if (taxa != Taxonomy.rank_prefixes[rank]
+                    and (count >= self.percent_to_classify * self.genes_in_scaffold[seq_id])
                     and (rank == 0 or expected_parent[taxa] == parent_taxa)):
                         seq_assignments[seq_id][rank] = [taxa, rank_hits[rank][taxa]]
                         parent_taxa = taxa

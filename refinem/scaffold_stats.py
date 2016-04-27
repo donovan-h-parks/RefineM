@@ -62,7 +62,7 @@ class ScaffoldStats(object):
         cpus : int
             Number of cpus to use.
         """
-        self.logger = logging.getLogger()
+        self.logger = logging.getLogger('timestamp')
 
         self.cpus = cpus
 
@@ -100,8 +100,7 @@ class ScaffoldStats(object):
             cov_profiles, _ = coverage.read(coverage_file)
 
         # determine bin assignment for each scaffold
-        self.logger.info('')
-        self.logger.info('  Determining scaffold statistics.')
+        self.logger.info('Determining scaffold statistics.')
 
         scaffold_id_genome_id = {}
         for gf in genome_files:

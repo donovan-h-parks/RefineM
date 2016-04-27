@@ -31,7 +31,7 @@ class Unbinned():
 
     def __init__(self):
         """Initialization."""
-        self.logger = logging.getLogger()
+        self.logger = logging.getLogger('timestamp')
 
     def run(self, genome_files, scaffold_file, min_seq_len):
         """Fragment genome sequences into fragments of a fixed size.
@@ -54,8 +54,7 @@ class Unbinned():
         check_file_exists(scaffold_file)
 
         # get list of sequences in bins
-        self.logger.info('')
-        self.logger.info('  Reading binned scaffolds.')
+        self.logger.info('Reading binned scaffolds.')
 
         binned_seq_ids = set()
         total_binned_bases = 0
@@ -64,11 +63,10 @@ class Unbinned():
                 binned_seq_ids.add(seq_id)
                 total_binned_bases += len(seq)
 
-        self.logger.info('    Read %d (%.2f Mbp) binned scaffolds.' % (len(binned_seq_ids), float(total_binned_bases) / 1e6))
+        self.logger.info('Read %d (%.2f Mbp) binned scaffolds.' % (len(binned_seq_ids), float(total_binned_bases) / 1e6))
 
         # write all unbinned sequences
-        self.logger.info('')
-        self.logger.info('  Identifying unbinned scaffolds >= %d bp.' % min_seq_len)
+        self.logger.info('Identifying unbinned scaffolds >= %d bp.' % min_seq_len)
 
         unbinned_bases = 0
         unbinned_seqs = {}
@@ -77,10 +75,9 @@ class Unbinned():
                 unbinned_seqs[seq_id] = seq
                 unbinned_bases += len(seq)
 
-        self.logger.info('    Identified %d (%.2f Mbp) unbinned scaffolds.' % (len(unbinned_seqs), float(unbinned_bases) / 1e6))
+        self.logger.info('Identified %d (%.2f Mbp) unbinned scaffolds.' % (len(unbinned_seqs), float(unbinned_bases) / 1e6))
 
-        self.logger.info('')
-        self.logger.info('  Percentage of unbinned scaffolds: %.2f%%' % (len(unbinned_seqs) * 100.0 / (len(unbinned_seqs) + len(binned_seq_ids))))
-        self.logger.info('  Percentage of unbinned bases: %.2f%%' % (unbinned_bases * 100.0 / (unbinned_bases + total_binned_bases)))
+        self.logger.info('Percentage of unbinned scaffolds: %.2f%%' % (len(unbinned_seqs) * 100.0 / (len(unbinned_seqs) + len(binned_seq_ids))))
+        self.logger.info('Percentage of unbinned bases: %.2f%%' % (unbinned_bases * 100.0 / (unbinned_bases + total_binned_bases)))
 
         return unbinned_seqs

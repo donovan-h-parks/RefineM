@@ -36,7 +36,7 @@ class Outliers():
     def __init__(self):
         """Initialization."""
 
-        self.logger = logging.getLogger()
+        self.logger = logging.getLogger('timestamp')
 
         self.min_required_coverage = 0.01
 
@@ -228,7 +228,7 @@ class Outliers():
         """
 
         # read reference distributions from file
-        self.logger.info('  Reading reference distributions.')
+        self.logger.info('Reading reference distributions.')
         self.gc_dist = self._read_distribution('gc_dist')
         self.td_dist = self._read_distribution('td_dist')
 
@@ -245,10 +245,11 @@ class Outliers():
         for genome_id, scaffold_ids in scaffold_stats.scaffolds_in_genome.iteritems():
             processed_genomes += 1
 
-            sys.stdout.write('    Finding outliers in %d of %d (%.1f%%) genomes.\r' % (processed_genomes,
-                                                                                     scaffold_stats.num_genomes(),
-                                                                                     processed_genomes * 100.0 / scaffold_stats.num_genomes()))
-            sys.stdout.flush()
+            if not self.logger.is_silent:
+                sys.stdout.write('  Finding outliers in %d of %d (%.1f%%) genomes.\r' % (processed_genomes,
+                                                                                         scaffold_stats.num_genomes(),
+                                                                                         processed_genomes * 100.0 / scaffold_stats.num_genomes()))
+                sys.stdout.flush()
 
             # find keys into GC and TD distributions
             # gc -> [mean GC][scaffold length][percentile]
@@ -314,7 +315,9 @@ class Outliers():
                     fout.write('\t%.2f\t%.2f\t%.2f\t%.2f' % (np_mean(stats.coverage), np_mean(gs.mean_coverage), corr_r, mean_cp))
                     fout.write('\n')
 
-        sys.stdout.write('\n')
+        if not self.logger.is_silent:
+            sys.stdout.write('\n')
+            
         fout.close()
 
     def compatible(self, scaffolds_of_interest,
@@ -353,8 +356,7 @@ class Outliers():
         """
 
         # read reference distributions from file
-        self.logger.info('')
-        self.logger.info('  Reading reference distributions.')
+        self.logger.info('Reading reference distributions.')
         self.gc_dist = self._read_distribution('gc_dist')
         self.td_dist = self._read_distribution('td_dist')
 
@@ -368,14 +370,15 @@ class Outliers():
 
         genomic_signature = GenomicSignature(0)
 
-        self.logger.info('  Identifying scaffolds compatible with bins.')
+        self.logger.info('Identifying scaffolds compatible with bins.')
         processed_scaffolds = 0
         for scaffold_id, ss in scaffold_stats.stats.iteritems():
             processed_scaffolds += 1
-            sys.stdout.write('    Processed %d of %d (%.1f%%) scaffolds.\r' % (processed_scaffolds,
-                                                                         len(scaffold_stats.stats),
-                                                                         processed_scaffolds * 100.0 / len(scaffold_stats.stats)))
-            sys.stdout.flush()
+            if not self.logger.is_silent:
+                sys.stdout.write('  Processed %d of %d (%.1f%%) scaffolds.\r' % (processed_scaffolds,
+                                                                             len(scaffold_stats.stats),
+                                                                             processed_scaffolds * 100.0 / len(scaffold_stats.stats)))
+                sys.stdout.flush()
 
             if scaffold_id not in scaffolds_of_interest:
                 continue
@@ -436,7 +439,9 @@ class Outliers():
                     fout.write('\t%d\t%.1f' % (scaffolds_of_interest[scaffold_id][0], scaffolds_of_interest[scaffold_id][1]))
                     fout.write('\n')
 
-        sys.stdout.write('\n')
+        if not self.logger.is_silent:
+            sys.stdout.write('\n')
+            
         fout.close()
 
     def create_html_index(self, plot_dir, genome_plots):

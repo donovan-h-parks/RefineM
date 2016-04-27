@@ -42,8 +42,6 @@ class ReadLoader:
         self.min_align_per = min_align_per
         self.max_edit_dist_per = max_edit_dist_per
 
-
-
     def __call__(self, read):
         self.num_reads += 1
 
@@ -84,24 +82,24 @@ class Coverage():
     """Calculate coverage of all sequences."""
 
     def __init__(self, cpus):
-        self.logger = logging.getLogger()
+        self.logger = logging.getLogger('timestamp')
+        self.reporter = logging.getLogger('no_timestamp')
 
         self.cpus = cpus
 
     def run(self, bam_files, out_file, all_reads, min_align_per, max_edit_dist_per):
         """Calculate coverage of sequences for each BAM file."""
 
-        # make sure all BAM files are sorted
+        # make sure all BAM files are indexed
         for bam_file in bam_files:
             if not os.path.exists(bam_file + '.bai'):
-                self.logger.error('  [Error] BAM file is not sorted: ' + bam_file + '\n')
+                self.logger.error('BAM index file is missing: ' + bam_file + '.bai\n')
                 sys.exit()
 
         # calculate coverage of each BAM file
         coverage_info = {}
         for i, bam_file in enumerate(bam_files):
-            self.logger.info('')
-            self.logger.info('  Calculating coverage profile for %s (%d of %d):' % (ntpath.basename(bam_file), i + 1, len(bam_files)))
+            self.logger.info('Calculating coverage profile for %s (%d of %d):' % (ntpath.basename(bam_file), i + 1, len(bam_files)))
 
             coverage_info[bam_file] = mp.Manager().dict()
             coverage_info[bam_file] = self._process_bam(bam_file, all_reads, min_align_per, max_edit_dist_per, coverage_info[bam_file])
@@ -117,7 +115,10 @@ class Coverage():
             row_str = seq_id + '\t' + str(coverage_info[coverage_info.keys()[0]][seq_id].seq_len)
             for bam_file in bam_files:
                 bam_id = remove_extension(bam_file)
-                row_str += '\t' + str(coverage_info[bam_file][seq_id].coverage)
+                if seq_id in coverage_info[bam_file]:
+                    row_str += '\t' + str(coverage_info[bam_file][seq_id].coverage)
+                else:
+                    row_str += '\t' + '0.0'
             fout.write(row_str + '\n')
 
         fout.close()
@@ -281,35 +282,35 @@ class Coverage():
             if seq_id == None:
                 break
 
-            if self.logger.getEffectiveLevel() <= logging.INFO:
+            if not self.logger.is_silent:
                 processed_ref_seqs += 1
-                statusStr = '    Finished processing %d of %d (%.2f%%) reference sequences.' % (processed_ref_seqs, num_reference_seqs, float(processed_ref_seqs) * 100 / num_reference_seqs)
+                statusStr = '  Finished processing %d of %d (%.2f%%) reference sequences.' % (processed_ref_seqs, num_reference_seqs, float(processed_ref_seqs) * 100 / num_reference_seqs)
                 sys.stderr.write('%s\r' % statusStr)
                 sys.stderr.flush()
 
-                total_reads += num_reads
-                total_duplicates += num_duplicates
-                total_secondary += num_secondary
-                total_failed_qc += num_failed_qc
-                total_failed_align_len += num_failed_align_len
-                total_failed_edit_dist += num_failed_edit_dist
-                total_failed_proper_pair += num_failed_proper_pair
-                total_mapped_reads += num_mapped_reads
+            total_reads += num_reads
+            total_duplicates += num_duplicates
+            total_secondary += num_secondary
+            total_failed_qc += num_failed_qc
+            total_failed_align_len += num_failed_align_len
+            total_failed_edit_dist += num_failed_edit_dist
+            total_failed_proper_pair += num_failed_proper_pair
+            total_mapped_reads += num_mapped_reads
 
             coverage_info[seq_id] = CoverageStruct(seq_len=seq_len, mapped_reads=num_mapped_reads, coverage=coverage)
 
-        if self.logger.getEffectiveLevel() <= logging.INFO:
+        if not self.logger.is_silent:
             sys.stderr.write('\n')
 
-            print ''
-            print '    # total reads: %d' % total_reads
-            print '      # properly mapped reads: %d (%.1f%%)' % (total_mapped_reads, float(total_mapped_reads) * 100 / total_reads)
-            print '      # duplicate reads: %d (%.1f%%)' % (total_duplicates, float(total_duplicates) * 100 / total_reads)
-            print '      # secondary reads: %d (%.1f%%)' % (total_secondary, float(total_secondary) * 100 / total_reads)
-            print '      # reads failing QC: %d (%.1f%%)' % (total_failed_qc, float(total_failed_qc) * 100 / total_reads)
-            print '      # reads failing alignment length: %d (%.1f%%)' % (total_failed_align_len, float(total_failed_align_len) * 100 / total_reads)
-            print '      # reads failing edit distance: %d (%.1f%%)' % (total_failed_edit_dist, float(total_failed_edit_dist) * 100 / total_reads)
-            print '      # reads not properly paired: %d (%.1f%%)' % (total_failed_proper_pair, float(total_failed_proper_pair) * 100 / total_reads)
+        self.reporter.info('')
+        self.reporter.info('  # total reads: %d' % total_reads)
+        self.reporter.info('    # properly mapped reads: %d (%.1f%%)' % (total_mapped_reads, float(total_mapped_reads) * 100 / total_reads))
+        self.reporter.info('    # duplicate reads: %d (%.1f%%)' % (total_duplicates, float(total_duplicates) * 100 / total_reads))
+        self.reporter.info('    # secondary reads: %d (%.1f%%)' % (total_secondary, float(total_secondary) * 100 / total_reads))
+        self.reporter.info('    # reads failing QC: %d (%.1f%%)' % (total_failed_qc, float(total_failed_qc) * 100 / total_reads))
+        self.reporter.info('    # reads failing alignment length: %d (%.1f%%)' % (total_failed_align_len, float(total_failed_align_len) * 100 / total_reads))
+        self.reporter.info('    # reads failing edit distance: %d (%.1f%%)' % (total_failed_edit_dist, float(total_failed_edit_dist) * 100 / total_reads))
+        self.reporter.info('    # reads not properly paired: %d (%.1f%%)' % (total_failed_proper_pair, float(total_failed_proper_pair) * 100 / total_reads))
 
     def read(self, coverage_file):
         """Read coverage information from file.
@@ -344,7 +345,7 @@ class Coverage():
                     for i, cov in enumerate(line_split[2:]):
                         coverage[scaffold_id][bam_ids[i]] = float(cov)
         except IOError:
-            print '[Error] Failed to open signature file: %s' % coverage_file
+            self.logger.error('Failed to open signature file: %s' % coverage_file)
             sys.exit()
         except:
             print traceback.format_exc()

@@ -45,7 +45,7 @@ class GenomeStats():
     def __init__(self):
         """Initialization."""
 
-        self.logger = logging.getLogger()
+        self.logger = logging.getLogger('timestamp')
 
         self.GenomeStats = namedtuple('GenomeStats', """genome_size
                                                         mean_gc
@@ -64,9 +64,8 @@ class GenomeStats():
             Statistics for individual scaffolds.
         """
 
-        self.logger.info('')
-        self.logger.info("  Calculating statistics for %d genomes over %d scaffolds." % (scaffold_stats.num_genomes(),
-                                                                                            scaffold_stats.num_scaffolds()))
+        self.logger.info("Calculating statistics for %d genomes over %d scaffolds." % (scaffold_stats.num_genomes(),
+                                                                                        scaffold_stats.num_scaffolds()))
 
         self.coverage_headers = scaffold_stats.coverage_headers
         self.signature_headers = scaffold_stats.signature_headers

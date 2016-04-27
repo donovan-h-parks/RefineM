@@ -31,7 +31,8 @@ class BinComparer(object):
 
     def __init__(self):
         """Initialize."""
-        self.logger = logging.getLogger()
+        self.logger = logging.getLogger('timestamp')
+        self.reporter = logging.getLogger('no_timestamp')
 
     def _genome_seqs(self, genome_files):
         """Get unique id of sequences in each genome.
@@ -108,8 +109,7 @@ class BinComparer(object):
         """
 
         # determine total number of sequences
-        self.logger.info('')
-        self.logger.info('  Reading sequences.')
+        self.logger.info('Reading sequences.')
 
         seq_lens = {}
         total_bases = 0
@@ -139,22 +139,22 @@ class BinComparer(object):
         genome_stats2 = sorted(genome_stats2.iteritems(), key=lambda x: x[1][1], reverse=True)
 
         # report summary results
-        self.logger.info('    Total seqs = %d (%.2f Mbp)' % (len(seq_lens), float(total_bases) / 1e6))
+        self.reporter.info('Total seqs = %d (%.2f Mbp)' % (len(seq_lens), float(total_bases) / 1e6))
         for length in lengths_to_check:
-            self.logger.info('      # seqs > %d kbp = %d (%.2f Mbp)' % (int(length / 1000),
+            self.reporter.info('  # seqs > %d kbp = %d (%.2f Mbp)' % (int(length / 1000),
                                                                         num_seqs_over_length[length],
                                                                         float(total_bases_over_length[length]) / 1e6))
 
-        self.logger.info('')
-        self.logger.info('  Binned seqs statistics:')
-        self.logger.info('    1) # genomes: %s, # binned seqs: %d (%.2f%%), # binned bases: %.2f Mbp (%.2f%%), # seqs in multiple bins: %d'
+        self.reporter.info('')
+        self.reporter.info('Binned seqs statistics:')
+        self.reporter.info('  1) # genomes: %s, # binned seqs: %d (%.2f%%), # binned bases: %.2f Mbp (%.2f%%), # seqs in multiple bins: %d'
                                 % (len(genome_seqs1),
                                    total_uniq_binned_seqs2,
                                    float(total_uniq_binned_seqs1) * 100 / len(seq_lens),
                                    float(total_uniq_binned_bases1) / 1e6,
                                    float(total_uniq_binned_bases1) * 100 / total_bases,
                                    num_repeats1))
-        self.logger.info('    2) # genomes: %s, # binned seqs: %d (%.2f%%), # binned bases: %.2f Mbp (%.2f%%), # seqs in multiple bins: %d'
+        self.reporter.info('  2) # genomes: %s, # binned seqs: %d (%.2f%%), # binned bases: %.2f Mbp (%.2f%%), # seqs in multiple bins: %d'
                                 % (len(genome_seqs2),
                                    total_uniq_binned_seqs2,
                                    float(total_uniq_binned_seqs2) * 100 / len(seq_lens),

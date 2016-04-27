@@ -45,7 +45,8 @@ class Cluster():
     def __init__(self, cpus):
         """Initialization."""
 
-        self.logger = logging.getLogger()
+        self.logger = logging.getLogger('timestamp')
+        self.reporter = logging.getLogger('no_timestamp')
 
         self.cpus = cpus
 
@@ -103,8 +104,7 @@ class Cluster():
         """
 
         # get GC and mean coverage for each scaffold in genome
-        self.logger.info('')
-        self.logger.info('  Determining mean coverage and genomic signatures.')
+        self.logger.info('Determining mean coverage and genomic signatures.')
         signatures = GenomicSignature(K)
         genome_stats = []
         signature_matrix = []
@@ -131,26 +131,26 @@ class Cluster():
         # calculate PCA of tetranucleotide signatures
         if K != 0:
             if not no_pca:
-                self.logger.info('  Calculating PCA of genomic signatures.')
+                self.logger.info('Calculating PCA of genomic signatures.')
                 pc, variance = self.pca(signature_matrix)
-                self.logger.info('    First %d PCs capture %.1f%% of the variance.' % (num_components, sum(variance[0:num_components]) * 100))
+                self.logger.info('First %d PCs capture %.1f%% of the variance.' % (num_components, sum(variance[0:num_components]) * 100))
     
                 for i, stats in enumerate(genome_stats):
                     genome_stats[i] = np_append(stats, pc[i][0:num_components])
             else:
-                self.logger.info('  Using complete genomic signature.')
+                self.logger.info('Using complete genomic signature.')
                 for i, stats in enumerate(genome_stats):
                     genome_stats[i] = np_append(stats, signature_matrix[i])
 
         # whiten data if feature matrix contains coverage and genomic signature data
         if not no_coverage and K != 0:
-            print '  Whitening data.'
+            self.logger.info('Whitening data.')
             genome_stats = whiten(genome_stats)
         else:
             genome_stats = np_array(genome_stats)
 
         # cluster
-        self.logger.info('  Partitioning genome into %d clusters.' % num_clusters)
+        self.logger.info('Partitioning genome into %d clusters.' % num_clusters)
 
         bError = True
         while bError:
@@ -161,7 +161,7 @@ class Cluster():
                 bError = True
 
         for k in range(num_clusters):
-            self.logger.info('    Placed %d sequences in cluster %d.' % (sum(labels == k), (k + 1)))
+            self.logger.info('Placed %d sequences in cluster %d.' % (sum(labels == k), (k + 1)))
 
         # write out clusters
         genome_id = remove_extension(genome_file)
