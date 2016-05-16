@@ -235,9 +235,9 @@ class Outliers():
         # identify outliers in each genome
         fout = open(output_file, 'w')
         fout.write('Scaffold id\tGenome id\tScaffold length (bp)\tOutlying distributions')
-        fout.write('\tScaffold GC\tMean genome GC\tLower GC bound (%s%%)\tUpper GC bound (%s%%)' % (gc_per, gc_per))
-        fout.write('\tScaffold TD\tMean genome TD\tUpper TD bound (%s%%)' % td_per)
-        fout.write('\tMean scaffold coverage\tMean genome coverage\tCoverage correlation\tMean coverage error\n')
+        fout.write('\tScaffold GC\tMedian genome GC\tLower GC bound (%s%%)\tUpper GC bound (%s%%)' % (gc_per, gc_per))
+        fout.write('\tScaffold TD\tMedian genome TD\tUpper TD bound (%s%%)' % td_per)
+        fout.write('\tScaffold coverage\tMedian genome coverage\tCoverage correlation\tCoverage error\n')
 
         genomic_signature = GenomicSignature(0)
 
@@ -255,7 +255,7 @@ class Outliers():
             # gc -> [mean GC][scaffold length][percentile]
             # td -> [scaffold length][percentile]
             gs = genome_stats[genome_id]
-            closest_gc = find_nearest(self.gc_dist.keys(), gs.mean_gc / 100.0)
+            closest_gc = find_nearest(self.gc_dist.keys(), gs.median_gc / 100.0)
             sample_seq_len = self.gc_dist[closest_gc].keys()[0]
             d = self.gc_dist[closest_gc][sample_seq_len]
             gc_lower_bound_key = find_nearest(d.keys(), (100 - gc_per) / 2.0)
@@ -274,8 +274,8 @@ class Outliers():
                 closest_seq_len = find_nearest(self.td_dist.keys(), stats.length)
                 td_bound = self.td_dist[closest_seq_len][td_bound_key]
 
-                # find changes from mean
-                delta_gc = (stats.gc - gs.mean_gc) / 100.0
+                # find changes from median
+                delta_gc = (stats.gc - gs.median_gc) / 100.0
                 delta_td = genomic_signature.manhattan(stats.signature, gs.mean_signature)
 
                 # determine if scaffold is an outlier
@@ -287,13 +287,13 @@ class Outliers():
                     outlying_dists.append('TD')
 
                 corr_r = 1.0
-                if len(gs.mean_coverage) > 1:
-                    corr_r, _corr_p = pearsonr(gs.mean_coverage, stats.coverage)
+                if len(gs.median_coverage) > 1:
+                    corr_r, _corr_p = pearsonr(gs.median_coverage, stats.coverage)
                     if  corr_r < cov_corr:
                         outlying_dists.append('COV_CORR')
 
                 mean_cp = []
-                for cov_genome, cov_scaffold in itertools.izip(gs.mean_coverage, stats.coverage):
+                for cov_genome, cov_scaffold in itertools.izip(gs.median_coverage, stats.coverage):
                     if cov_genome >= self.min_required_coverage:
                         mean_cp.append(abs(cov_scaffold - cov_genome) * 100.0 / cov_genome)
 
@@ -310,9 +310,9 @@ class Outliers():
                 # report outliers
                 if (report_type == 'any' and len(outlying_dists) >= 1) or (report_type == 'all' and len(outlying_dists) >= 3):
                     fout.write('%s\t%s\t%s\t%s' % (scaffold_id, genome_id, stats.length, ','.join(outlying_dists)))
-                    fout.write('\t%.2f\t%.2f\t%.2f\t%.2f' % (stats.gc, gs.mean_gc, gs.mean_gc + gc_lower_bound * 100, gs.mean_gc + gc_upper_bound * 100))
-                    fout.write('\t%.3f\t%.3f\t%.3f' % (delta_td, gs.mean_td, td_bound))
-                    fout.write('\t%.2f\t%.2f\t%.2f\t%.2f' % (np_mean(stats.coverage), np_mean(gs.mean_coverage), corr_r, mean_cp))
+                    fout.write('\t%.2f\t%.2f\t%.2f\t%.2f' % (stats.gc, gs.median_gc, gs.median_gc + gc_lower_bound * 100, gs.median_gc + gc_upper_bound * 100))
+                    fout.write('\t%.3f\t%.3f\t%.3f' % (delta_td, gs.median_td, td_bound))
+                    fout.write('\t%.2f\t%.2f\t%.2f\t%.2f' % (np_mean(stats.coverage), np_mean(gs.median_coverage), corr_r, mean_cp))
                     fout.write('\n')
 
         if not self.logger.is_silent:
@@ -363,9 +363,9 @@ class Outliers():
         # identify compatible scaffolds in each genome
         fout = open(output_file, 'w')
         fout.write('Scaffold id\tGenome id\tScaffold length (bp)\tCompatible distributions')
-        fout.write('\tScaffold GC\tMean genome GC\tLower GC bound (%s%%)\tUpper GC bound (%s%%)' % (gc_per, gc_per))
-        fout.write('\tScaffold TD\tMean genome TD\tUpper TD bound (%s%%)' % td_per)
-        fout.write('\tMean scaffold coverage\tMean genome coverage\tCoverage correlation\tMean coverage error')
+        fout.write('\tScaffold GC\tMedian genome GC\tLower GC bound (%s%%)\tUpper GC bound (%s%%)' % (gc_per, gc_per))
+        fout.write('\tScaffold TD\tMedian genome TD\tUpper TD bound (%s%%)' % td_per)
+        fout.write('\tScaffold coverage\tMedian genome coverage\tCoverage correlation\tCoverage error')
         fout.write('\t# genes\t% genes with homology\n')
 
         genomic_signature = GenomicSignature(0)
@@ -387,7 +387,7 @@ class Outliers():
                 # find keys into GC and TD distributions
                 # gc -> [mean GC][scaffold length][percentile]
                 # td -> [scaffold length][percentile]
-                closest_gc = find_nearest(self.gc_dist.keys(), gs.mean_gc / 100.0)
+                closest_gc = find_nearest(self.gc_dist.keys(), gs.median_gc / 100.0)
                 sample_seq_len = self.gc_dist[closest_gc].keys()[0]
                 d = self.gc_dist[closest_gc][sample_seq_len]
                 gc_lower_bound_key = find_nearest(d.keys(), (100 - gc_per) / 2.0)
@@ -404,7 +404,7 @@ class Outliers():
                 td_bound = self.td_dist[closest_seq_len][td_bound_key]
 
                 # find changes from mean
-                delta_gc = (ss.gc - gs.mean_gc) / 100.0
+                delta_gc = (ss.gc - gs.median_gc) / 100.0
                 delta_td = genomic_signature.manhattan(ss.signature, gs.mean_signature)
 
                 # determine if scaffold compatible
@@ -416,13 +416,13 @@ class Outliers():
                     compatible_dists.append('TD')
 
                 corr_r = 1.0
-                if len(gs.mean_coverage) > 1:
-                    corr_r, _corr_p = pearsonr(gs.mean_coverage, ss.coverage)
+                if len(gs.median_coverage) > 1:
+                    corr_r, _corr_p = pearsonr(gs.median_coverage, ss.coverage)
                     if  corr_r >= cov_corr:
                         compatible_dists.append('COV_CORR')
 
                 mean_cp = []
-                for cov_genome, cov_scaffold in itertools.izip(gs.mean_coverage, ss.coverage):
+                for cov_genome, cov_scaffold in itertools.izip(gs.median_coverage, ss.coverage):
                     if cov_genome >= self.min_required_coverage:
                         mean_cp.append(abs(cov_genome - cov_scaffold) * 100.0 / cov_genome)
 
@@ -433,9 +433,9 @@ class Outliers():
                 # report compatible scaffolds
                 if (report_type == 'any' and len(compatible_dists) >= 1) or (report_type == 'all' and len(compatible_dists) >= 3):
                     fout.write('%s\t%s\t%s\t%s' % (scaffold_id, genome_id, ss.length, ','.join(compatible_dists)))
-                    fout.write('\t%.2f\t%.2f\t%.2f\t%.2f' % (ss.gc, gs.mean_gc, gs.mean_gc + gc_lower_bound * 100, gs.mean_gc + gc_upper_bound * 100))
-                    fout.write('\t%.3f\t%.3f\t%.3f' % (delta_td, gs.mean_td, td_bound))
-                    fout.write('\t%.2f\t%.2f\t%.2f\t%.2f' % (np_mean(ss.coverage), np_mean(gs.mean_coverage), corr_r, mean_cp))
+                    fout.write('\t%.2f\t%.2f\t%.2f\t%.2f' % (ss.gc, gs.median_gc, gs.median_gc + gc_lower_bound * 100, gs.median_gc + gc_upper_bound * 100))
+                    fout.write('\t%.3f\t%.3f\t%.3f' % (delta_td, gs.median_td, td_bound))
+                    fout.write('\t%.2f\t%.2f\t%.2f\t%.2f' % (np_mean(ss.coverage), np_mean(gs.median_coverage), corr_r, mean_cp))
                     fout.write('\t%d\t%.1f' % (scaffolds_of_interest[scaffold_id][0], scaffolds_of_interest[scaffold_id][1]))
                     fout.write('\n')
 
