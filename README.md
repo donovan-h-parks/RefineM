@@ -2,7 +2,8 @@
 
 <b>[This project is in active development and not currently recommended for public use.]</b>
 
-[![PyPI version](https://badge.fury.io/py/refinem.svg)](https://badge.fury.io/py/refinem)
+[![version status](https://img.shields.io/pypi/v/refinem.svg)](https://pypi.python.org/pypi/refinem)
+[![downloads](https://img.shields.io/pypi/dm/refinem.svg)](https://pypi.python.org/pypi/refinem)
 
 RefineM is a set of tools for improving population genomes. It provides methods designed to improve the completeness of a genome along with methods for identifying and removing contamination. RefineM comprises only part of a full genome QC pipeline and should be used in conjunction with existing QC tools such as [CheckM](https://github.com/Ecogenomics/CheckM/wiki). The functionality currently planned is:
 
