@@ -36,6 +36,28 @@ class TetraPcaPlot(BasePlot):
         self.pca_computed = False
         self.pc = None
         self.variance = None
+        
+    def data_pts(self, genome_scaffold_stats, pc_xaxis, pc_yaxis):
+        """Get data points to plot.
+
+        Parameters
+        ----------
+        genome_scaffold_stats : d[scaffold_id] -> namedtuple of scaffold stats
+          Statistics for scaffolds in genome.
+          
+        Returns
+        -------
+        dict : d[scaffold_id] -> (x, y)
+        """
+        
+        if not self.pca_computed:
+            self.pca(genome_scaffold_stats)
+    
+        pts = {}
+        for i, scaffold_id in enumerate(genome_scaffold_stats):
+            pts[scaffold_id] = (self.pc[i][pc_xaxis], self.pc[i][pc_yaxis])
+            
+        return pts
 
     def pca(self, genome_scaffold_stats):
         """Perform PCA.
@@ -96,11 +118,11 @@ class TetraPcaPlot(BasePlot):
         axis_pc1_pc3 = self.fig.add_subplot(223)
         axis_variance = self.fig.add_subplot(224)
 
-        scatter = self.plot_on_axes(self.fig, 0, 1,
-                          genome_scaffold_stats,
-                          highlight_scaffold_ids,
-                          link_scaffold_ids,
-                          axis_pc1_pc2, True)
+        scatter, _, _, _ = self.plot_on_axes(self.fig, 0, 1,
+                                              genome_scaffold_stats,
+                                              highlight_scaffold_ids,
+                                              link_scaffold_ids,
+                                              axis_pc1_pc2, True)
 
         self.plot_on_axes(self.fig, 2, 1,
                           genome_scaffold_stats,
@@ -147,27 +169,25 @@ class TetraPcaPlot(BasePlot):
           Axis on which to render scatterplot.
         """
 
-        if not self.pca_computed:
-            self.pca(genome_scaffold_stats)
-
-        scaffold_stats = {}
-        for i, scaffold_id in enumerate(genome_scaffold_stats):
-            scaffold_stats[scaffold_id] = (self.pc[i][pc_xaxis], self.pc[i][pc_yaxis])
+        pts = self.data_pts(genome_scaffold_stats, pc_xaxis, pc_yaxis)
 
         # scatterplot
         xlabel = 'PC %d (%.1f%%)' % (pc_xaxis + 1, self.variance[pc_xaxis] * 100)
         ylabel = 'PC %d (%.1f%%)' % (pc_yaxis + 1, self.variance[pc_yaxis] * 100)
 
-        scatter, labels = self.scatter(axis, scaffold_stats,
-                                       highlight_scaffold_ids, link_scaffold_ids,
-                                       xlabel, ylabel)
+        scatter, x, y, labels = self.scatter(axis, 
+                                                pts,
+                                                highlight_scaffold_ids, 
+                                                link_scaffold_ids,
+                                                xlabel, 
+                                                ylabel)
 
         # tooltips plugin
         if tooltip_plugin:
             tooltip = Tooltip(scatter, labels=labels, hoffset=5, voffset=-15)
             mpld3.plugins.connect(figure, tooltip)
 
-        return scatter
+        return scatter, x, y, self.plot_order(labels)
 
     def plot_variance(self, axis):
         """Create plot of variance captured by each principal component.

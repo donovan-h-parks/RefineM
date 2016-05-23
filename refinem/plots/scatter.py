@@ -21,10 +21,10 @@ import mpld3
 from numpy import mean
 
 from refinem.plots.base_plot import BasePlot
-from refinem.plots.mpld3_plugins import Tooltip, LinkedBrush
+from refinem.plots.mpld3_plugins import Tooltip
 
 
-class GcCovPlot(BasePlot):
+class Scatter(BasePlot):
     """Create a GC vs total coverage scatterplot."""
 
     def __init__(self, options):
@@ -50,49 +50,13 @@ class GcCovPlot(BasePlot):
             
         return pts
 
-    def plot(self, genome_scaffold_stats, highlight_scaffold_ids, link_scaffold_ids, mean_gc, mean_coverage):
-        """Setup figure for plots.
-
-        Parameters
-        ----------
-        genome_scaffold_stats : d[scaffold_id] -> namedtuple of scaffold stats
-          Statistics for scaffolds in genome.
-        highlight_scaffold_ids : d[scaffold_id] -> color
-          Scaffolds in genome to highlight.
-        link_scaffold_ids : list of scaffold pairs
-          Pairs of scaffolds to link together.
-        mean_gc : float
-          Mean GC of genome.
-        mean_coverage : list of float
-          Mean coverage profile of genome.
-        """
-
-        # Set size of figure
-        self.fig.clear()
-
-        mpld3.plugins.clear(self.fig)
-        mpld3.plugins.connect(self.fig, mpld3.plugins.Reset(), mpld3.plugins.BoxZoom(), mpld3.plugins.Zoom())
-        mpld3.plugins.connect(self.fig, mpld3.plugins.MousePosition(fontsize=12, fmt='.1f'))
-
-        self.fig.set_size_inches(self.options.width, self.options.height)
-
-        axis = self.fig.add_subplot(111)
-
-        scatter, _, _,  _ = self.plot_on_axes(self.fig, genome_scaffold_stats,
-                                                highlight_scaffold_ids, link_scaffold_ids,
-                                                mean_gc, mean_coverage,
-                                                axis, True)
-                                                  
-        mpld3.plugins.connect(self.fig, LinkedBrush(scatter))
-
-        self.fig.tight_layout(pad=1, w_pad=1)
-        self.draw()
-
     def plot_on_axes(self, figure,
-                     genome_scaffold_stats,
-                     highlight_scaffold_ids, link_scaffold_ids,
-                     mean_gc, mean_coverage,
-                     axis, tooltip_plugin):
+                     x, y, pt_labels,
+                     xlabel, ylabel,
+                     highlight_scaffold_ids, 
+                     link_scaffold_ids,
+                     axis, 
+                     tooltip_plugin):
         """Create GC vs. coverage scatterplot.
 
         Parameters
@@ -113,22 +77,16 @@ class GcCovPlot(BasePlot):
           Axis on which to render scatterplot.
         """
 
-        pts = self.data_pts(genome_scaffold_stats)
-
-        # scatterplot
-        xlabel = 'GC (mean = %.1f%%)' % mean_gc
-        ylabel = 'Coverage (mean = %.1f)' % mean(mean_coverage)
-
-        scatter, x_pts, y_pts, labels = self.scatter(axis, 
-                                                        pts,
-                                                        highlight_scaffold_ids, 
-                                                        link_scaffold_ids,
-                                                        xlabel, 
-                                                        ylabel)
+        scatter, labels = self.scatter_fixed_order(axis, 
+                                                    x, y, pt_labels,
+                                                    highlight_scaffold_ids, 
+                                                    link_scaffold_ids,
+                                                    xlabel, 
+                                                    ylabel)
 
         # tooltips plugin
         if tooltip_plugin:
             tooltip = Tooltip(scatter, labels=labels, hoffset=5, voffset=-15)
             mpld3.plugins.connect(figure, tooltip)
 
-        return scatter, x_pts, y_pts, self.plot_order(labels)
+        return scatter

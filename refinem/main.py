@@ -246,142 +246,19 @@ class OptionsParser():
 
         # create outlier plots
         if not options.no_plots:
-            highlight_scaffolds_ids = {}
-            if options.highlight_file:
-                for line in open(options.highlight_file):
-                    if not line.strip():
-                        continue
-
-                    line_split = line.strip().split('\t')
-                    if len(line_split) > 1:
-                        highlight_scaffolds_ids[line_split[0]] = [float(x.strip()) / 255.0 for x in line_split[1].split(',')]
-                    else:
-                        highlight_scaffolds_ids[line_split[0]] = [1.0, 0, 0]
-
-            link_scaffold_ids = []
-            if options.links_file:
-                for line in open(options.links_file):
-                    if not line.strip():
-                        continue
-
-                    line_split = line.strip().split('\t')
-                    if len(line_split) == 2:
-                        link_scaffold_ids.append([line_split[0], (1.0, 0.0, 0.0), line_split[1], (1.0, 0.0, 0.0)])
-                    else:
-                        link_scaffold_ids.append([line_split[0],
-                                                  [float(x) / 255 for x in line_split[1].split(',')],
-                                                  line_split[2],
-                                                  [float(x) / 255 for x in line_split[3].split(',')]])
-
-            # create plots
             plot_dir = os.path.join(options.output_dir, 'plots')
             make_sure_path_exists(plot_dir)
+        
+            outliers.plot(scaffold_stats,
+                            genome_stats,
+                            outliers.gc_dist,
+                            outliers.td_dist,
+                            options, 
+                            options.highlight_file,
+                            options.links_file,
+                            options.individual_plots,
+                            plot_dir)
             
-            genomes_processed = 0
-            genome_plots = defaultdict(list)
-            for genome_id, gs in genome_stats.iteritems():
-                genomes_processed += 1
-
-                if not self.logger.is_silent:
-                    sys.stdout.write('  Plotting scaffold distribution for %d of %d (%.1f%%) genomes.\r' %
-                                                                                                    (genomes_processed,
-                                                                                                     len(genome_stats),
-                                                                                                     genomes_processed * 100.0 / len(genome_stats)))
-                    sys.stdout.flush()
-
-                genome_scaffold_stats = {}
-                for scaffold_id in scaffold_stats.scaffolds_in_genome[genome_id]:
-                    genome_scaffold_stats[scaffold_id] = scaffold_stats.stats[scaffold_id]
-
-                if options.individual_plots:
-                    # GC plot
-                    gc_plots = GcPlots(options)
-                    gc_plots.plot(genome_scaffold_stats, highlight_scaffolds_ids, link_scaffold_ids, gs.mean_gc, outliers.gc_dist, [options.gc_perc])
-
-                    output_plot = os.path.join(plot_dir, genome_id + '.gc_plots.' + options.image_type)
-                    gc_plots.save_plot(output_plot, dpi=options.dpi)
-                    gc_plots.save_html(os.path.join(plot_dir, genome_id + '.gc_plots.html'))
-
-                    # TD plot
-                    td_plots = TdPlots(options)
-                    td_plots.plot(genome_scaffold_stats, highlight_scaffolds_ids, link_scaffold_ids, gs.mean_signature, outliers.td_dist, [options.td_perc])
-
-                    output_plot = os.path.join(plot_dir, genome_id + '.td_plots.' + options.image_type)
-                    td_plots.save_plot(output_plot, dpi=options.dpi)
-                    td_plots.save_html(os.path.join(plot_dir, genome_id + '.td_plots.html'))
-
-                    # mean absolute deviation of coverage profiles
-                    cov_perc_plots = CovPercPlots(options)
-                    cov_perc_plots.plot(genome_scaffold_stats, highlight_scaffolds_ids, link_scaffold_ids, gs.mean_coverage, [options.cov_perc])
-
-                    output_plot = os.path.join(plot_dir, genome_id + '.cov_perc.' + options.image_type)
-                    cov_perc_plots.save_plot(output_plot, dpi=options.dpi)
-                    cov_perc_plots.save_html(os.path.join(plot_dir, genome_id + '.cov_perc.html'))
-
-                    # coverage correlation plots
-                    if len(gs.mean_coverage) > 1:
-                        cov_corr_plots = CovCorrPlots(options)
-                        cov_corr_plots.plot(genome_scaffold_stats, highlight_scaffolds_ids, gs.mean_coverage, [options.cov_corr])
-
-                        output_plot = os.path.join(plot_dir, genome_id + '.cov_corr.' + options.image_type)
-                        cov_corr_plots.save_plot(output_plot, dpi=options.dpi)
-                        cov_corr_plots.save_html(os.path.join(plot_dir, genome_id + '.cov_corr.html'))
-
-                # combined distribution, GC vs. coverage, and tetranucleotide signature plots
-                combined_plots = CombinedPlots(options)
-                combined_plots.plot(genome_scaffold_stats,
-                                highlight_scaffolds_ids, link_scaffold_ids, gs,
-                                outliers.gc_dist, outliers.td_dist,
-                                options.gc_perc, options.td_perc, options.cov_perc)
-
-                output_plot = os.path.join(plot_dir, genome_id + '.combined.' + options.image_type)
-                combined_plots.save_plot(output_plot, dpi=options.dpi)
-                combined_plots.save_html(os.path.join(plot_dir, genome_id + '.combined.html'))
-
-                genome_plots[genome_id].append(('Combined', genome_id + '.combined.html'))
-
-                # combined plot of distributions
-                dist_plots = DistributionPlots(options)
-                dist_plots.plot(genome_scaffold_stats,
-                                highlight_scaffolds_ids,
-                                link_scaffold_ids,
-                                gs,
-                                outliers.gc_dist, outliers.td_dist,
-                                options.gc_perc, options.td_perc, options.cov_perc)
-
-                output_plot = os.path.join(plot_dir, genome_id + '.dist_plot.' + options.image_type)
-                dist_plots.save_plot(output_plot, dpi=options.dpi)
-                dist_plots.save_html(os.path.join(plot_dir, genome_id + '.dist_plot.html'))
-
-                genome_plots[genome_id].append(('Distributions', genome_id + '.dist_plot.html'))
-
-                # GC vs. coverage plot
-                gc_cov_plot = GcCovPlot(options)
-                gc_cov_plot.plot(genome_scaffold_stats,
-                                 highlight_scaffolds_ids, link_scaffold_ids,
-                                 gs.mean_gc, gs.mean_coverage)
-
-                output_plot = os.path.join(plot_dir, genome_id + '.gc_coverge.' + options.image_type)
-                gc_cov_plot.save_plot(output_plot, dpi=options.dpi)
-                gc_cov_plot.save_html(os.path.join(plot_dir, genome_id + '.gc_coverge.html'))
-
-                genome_plots[genome_id].append(('GC vs. coverage', genome_id + '.gc_coverge.html'))
-
-                # tetranucleotide signature PCA plot
-                tetra = TetraPcaPlot(options)
-                tetra.plot(genome_scaffold_stats, highlight_scaffolds_ids, link_scaffold_ids)
-
-                output_plot = os.path.join(plot_dir, genome_id + '.tetra_pca.' + options.image_type)
-                tetra.save_plot(output_plot, dpi=options.dpi)
-                tetra.save_html(os.path.join(plot_dir, genome_id + '.tetra_pca.html'))
-
-                genome_plots[genome_id].append(('Tetra PCA', genome_id + '.tetra_pca.html'))
-                
-            outliers.create_html_index(plot_dir, genome_plots)
-
-            if not self.logger.is_silent:
-                sys.stdout.write('\n')
-
             self.logger.info('Outlier plots written to: ' + plot_dir)
 
     def cluster(self, options):

@@ -32,6 +32,28 @@ class TdPlots(BasePlot):
     def __init__(self, options):
         """Initialize."""
         BasePlot.__init__(self, options)
+        
+    def data_pts(self, genome_scaffold_stats, mean_signature):
+        """Get data points to plot.
+
+        Parameters
+        ----------
+        genome_scaffold_stats : d[scaffold_id] -> namedtuple of scaffold stats
+          Statistics for scaffolds in genome.
+          
+        Returns
+        -------
+        dict : d[scaffold_id] -> (x, y)
+        """
+        
+        genomic_signature = GenomicSignature(0)
+
+        pts = {}
+        for scaffold_id, stats in genome_scaffold_stats.iteritems():
+            pts[scaffold_id] = (genomic_signature.manhattan(stats.signature, mean_signature), 
+                                stats.length / 1000.0)
+            
+        return pts
 
     def plot(self, genome_scaffold_stats,
              highlight_scaffold_ids, link_scaffold_ids,
@@ -118,15 +140,13 @@ class TdPlots(BasePlot):
         xlabel = 'tetranucleotide distance'
         ylabel = 'Scaffold length (kbp)'
 
-        scaffold_stats = {}
-        for i, (scaffold_id, stats) in enumerate(genome_scaffold_stats.iteritems()):
-            scaffold_stats[scaffold_id] = (delta_tds[i], stats.length / 1000.0)
-
-        scatter, labels = self.scatter(axes_scatter,
-                                         scaffold_stats,
-                                         highlight_scaffold_ids,
-                                         link_scaffold_ids,
-                                         xlabel, ylabel)
+        pts = self.data_pts(genome_scaffold_stats, mean_signature)
+            
+        scatter, x_pts, y_pts, labels = self.scatter(axes_scatter,
+                                                     pts,
+                                                     highlight_scaffold_ids,
+                                                     link_scaffold_ids,
+                                                     xlabel, ylabel)
 
         _, ymax = axes_scatter.get_ylim()
         xmin, xmax = axes_scatter.get_xlim()
@@ -176,4 +196,4 @@ class TdPlots(BasePlot):
             tooltip = Tooltip(scatter, labels=labels, hoffset=5, voffset=-15)
             mpld3.plugins.connect(figure, tooltip)
 
-        return scatter
+        return scatter, x_pts, y_pts, self.plot_order(labels)

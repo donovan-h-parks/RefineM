@@ -67,26 +67,33 @@ class DistributionPlots(AbstractPlot):
         mpld3.plugins.connect(self.fig, mpld3.plugins.Reset(), mpld3.plugins.BoxZoom(), mpld3.plugins.Zoom())
         mpld3.plugins.connect(self.fig, mpld3.plugins.MousePosition(fontsize=12, fmt='.1f'))
 
-        self.fig.set_size_inches(self.options.width, self.options.height)
+        self.fig.set_size_inches(self.options.width*(2.0/3), self.options.height)
 
-        axes_hist_GC = self.fig.add_subplot(321)
-        axes_scatter_GC = self.fig.add_subplot(322)
-        axes_hist_TD = self.fig.add_subplot(323)
-        axes_scatter_TD = self.fig.add_subplot(324)
-        axes_hist_cov_perc = self.fig.add_subplot(325)
-        axes_scatter_cov_perc = self.fig.add_subplot(326)
+        # create subplots depending on availability of coverage information
+        if len(genome_stats.mean_coverage) >= 1:
+            axes_hist_GC = self.fig.add_subplot(321)
+            axes_scatter_GC = self.fig.add_subplot(322)
+            axes_hist_TD = self.fig.add_subplot(323)
+            axes_scatter_TD = self.fig.add_subplot(324)
+            axes_hist_cov_perc = self.fig.add_subplot(325)
+            axes_scatter_cov_perc = self.fig.add_subplot(326)
+        else:
+            axes_hist_GC = self.fig.add_subplot(221)
+            axes_scatter_GC = self.fig.add_subplot(222)
+            axes_hist_TD = self.fig.add_subplot(223)
+            axes_scatter_TD = self.fig.add_subplot(224)
 
         gc_plots = GcPlots(self.options)
-        scatter = gc_plots.plot_on_axes(self.fig,
-                                genome_scaffold_stats,
-                                highlight_scaffold_ids,
-                                link_scaffold_ids,
-                                genome_stats.mean_gc,
-                                gc_dist,
-                                [gc_perc],
-                                axes_hist_GC,
-                                axes_scatter_GC,
-                                True)
+        scatter, _, _, _ = gc_plots.plot_on_axes(self.fig,
+                                                    genome_scaffold_stats,
+                                                    highlight_scaffold_ids,
+                                                    link_scaffold_ids,
+                                                    genome_stats.mean_gc,
+                                                    gc_dist,
+                                                    [gc_perc],
+                                                    axes_hist_GC,
+                                                    axes_scatter_GC,
+                                                    True)
 
         td_plots = TdPlots(self.options)
         td_plots.plot_on_axes(self.fig,
@@ -100,20 +107,21 @@ class DistributionPlots(AbstractPlot):
                                 axes_scatter_TD,
                                 True)
 
-        cov_per_plots = CovPercPlots(self.options)
-        cov_per_plots.plot_on_axes(self.fig,
-                                genome_scaffold_stats,
-                                highlight_scaffold_ids,
-                                link_scaffold_ids,
-                                genome_stats.mean_coverage,
-                                [cov_perc],
-                                axes_hist_cov_perc,
-                                axes_scatter_cov_perc,
-                                True)
+        if len(genome_stats.mean_coverage) >= 1:
+            cov_per_plots = CovPercPlots(self.options)
+            cov_per_plots.plot_on_axes(self.fig,
+                                    genome_scaffold_stats,
+                                    highlight_scaffold_ids,
+                                    link_scaffold_ids,
+                                    genome_stats.mean_coverage,
+                                    [cov_perc],
+                                    axes_hist_cov_perc,
+                                    axes_scatter_cov_perc,
+                                    True)
 
         mpld3.plugins.connect(self.fig, LinkedBrush(scatter))
 
-        self.fig.tight_layout(pad=1, w_pad=2, h_pad=2)
+        self.fig.tight_layout(pad=1.0, w_pad=0.1, h_pad=0.1)
         self.draw()
 
     def save_html(self, output_html):

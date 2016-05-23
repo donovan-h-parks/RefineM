@@ -29,6 +29,15 @@ import biolib.seq_io as seq_io
 from biolib.common import find_nearest, alphanumeric_sort, remove_extension
 from biolib.genomic_signature import GenomicSignature
 
+from refinem.plots.gc_plots import GcPlots
+from refinem.plots.td_plots import TdPlots
+from refinem.plots.cov_perc_plots import CovPercPlots
+from refinem.plots.cov_corr_plots import CovCorrPlots
+from refinem.plots.distribution_plots import DistributionPlots
+from refinem.plots.gc_cov_plot import GcCovPlot
+from refinem.plots.tetra_pca_plot import TetraPcaPlot
+from refinem.plots.combined_plots import CombinedPlots
+
 
 class Outliers():
     """Identify scaffolds with divergent or compatible genomic characteristics."""
@@ -37,6 +46,7 @@ class Outliers():
         """Initialization."""
 
         self.logger = logging.getLogger('timestamp')
+        self.reporter = logging.getLogger('no_timestamp')
 
         self.min_required_coverage = 0.01
 
@@ -145,10 +155,10 @@ class Outliers():
         with open(compatible_file) as f:
             headers = [x.strip() for x in f.readline().split('\t')]
             scaffold_gc_index = headers.index('Scaffold GC')
-            genome_gc_index = headers.index('Mean genome GC')
+            genome_gc_index = headers.index('Median genome GC')
             td_dist_index = headers.index('Scaffold TD')
-            scaffold_cov_index = headers.index('Mean scaffold coverage')
-            genome_cov_index = headers.index('Mean genome coverage')
+            scaffold_cov_index = headers.index('Scaffold coverage')
+            genome_cov_index = headers.index('Median genome coverage')
 
             for line in f:
                 line_split = line.split('\t')
@@ -285,34 +295,51 @@ class Outliers():
 
                 if delta_td > td_bound:
                     outlying_dists.append('TD')
-
-                corr_r = 1.0
-                if len(gs.median_coverage) > 1:
-                    corr_r, _corr_p = pearsonr(gs.median_coverage, stats.coverage)
-                    if  corr_r < cov_corr:
+                    
+                # care is required for coverage, since this information
+                # is not always provided
+                if len(gs.median_coverage) >= 1: 
+                    # there is coverage information
+                    mean_genome_cov = np_mean(gs.median_coverage)
+                    
+                    if len(stats.coverage) == 0:
+                        # however, this scaffold has no reported 
+                        # coverage so flag it as a likely outlier
+                        mean_scaffold_cov = 0
+                        corr_r = -1
+                        mean_cp = -1
                         outlying_dists.append('COV_CORR')
-
-                mean_cp = []
-                for cov_genome, cov_scaffold in itertools.izip(gs.median_coverage, stats.coverage):
-                    if cov_genome >= self.min_required_coverage:
-                        mean_cp.append(abs(cov_scaffold - cov_genome) * 100.0 / cov_genome)
-
-                if len(mean_cp) == 0:
-                    # genome has zero coverage which is general
-                    # will indicate something is wrong
-                    mean_cp = -1
-                    outlying_dists.append('COV_PERC')
-                else:
-                    mean_cp = np_mean(mean_cp)
-                    if mean_cp > cov_perc:
                         outlying_dists.append('COV_PERC')
+                    else:     
+                        mean_scaffold_cov = np_mean(stats.coverage)
+
+                        corr_r = 1.0
+                        if len(gs.median_coverage) > 1:
+                            corr_r, _corr_p = pearsonr(gs.median_coverage, stats.coverage)
+                            if  corr_r < cov_corr:
+                                outlying_dists.append('COV_CORR')
+
+                        mean_cp = []
+                        for cov_genome, cov_scaffold in itertools.izip(gs.median_coverage, stats.coverage):
+                            if cov_genome >= self.min_required_coverage:
+                                mean_cp.append(abs(cov_scaffold - cov_genome) * 100.0 / cov_genome)
+
+                        mean_cp = np_mean(mean_cp)
+                        if mean_cp > cov_perc:
+                            outlying_dists.append('COV_PERC')
+                else:
+                    # no coverage information was provided
+                    mean_genome_cov = 0
+                    mean_scaffold_cov = 0
+                    corr_r = 1.0
+                    mean_cp = 0.0
 
                 # report outliers
                 if (report_type == 'any' and len(outlying_dists) >= 1) or (report_type == 'all' and len(outlying_dists) >= 3):
                     fout.write('%s\t%s\t%s\t%s' % (scaffold_id, genome_id, stats.length, ','.join(outlying_dists)))
                     fout.write('\t%.2f\t%.2f\t%.2f\t%.2f' % (stats.gc, gs.median_gc, gs.median_gc + gc_lower_bound * 100, gs.median_gc + gc_upper_bound * 100))
                     fout.write('\t%.3f\t%.3f\t%.3f' % (delta_td, gs.median_td, td_bound))
-                    fout.write('\t%.2f\t%.2f\t%.2f\t%.2f' % (np_mean(stats.coverage), np_mean(gs.median_coverage), corr_r, mean_cp))
+                    fout.write('\t%.2f\t%.2f\t%.2f\t%.2f' % (mean_scaffold_cov, mean_genome_cov, corr_r, mean_cp))
                     fout.write('\n')
 
         if not self.logger.is_silent:
@@ -443,7 +470,191 @@ class Outliers():
             sys.stdout.write('\n')
             
         fout.close()
+        
+    def _plot_highlight(self, highlight_file):
+        """Get scaffolds to highlight in plot."""
+        highlight_scaffolds_ids = {}
+        if highlight_file:
+            for line in open(highlight_file):
+                if not line.strip():
+                    continue
 
+                line_split = line.strip().split('\t')
+                if len(line_split) > 1:
+                    highlight_scaffolds_ids[line_split[0]] = [float(x.strip()) / 255.0 for x in line_split[1].split(',')]
+                else:
+                    highlight_scaffolds_ids[line_split[0]] = [1.0, 0, 0]
+                    
+        return highlight_scaffolds_ids
+        
+    def _plot_link(self, links_file):
+        """Get scaffolds to link in plot."""
+        
+        link_scaffold_ids = []
+        if links_file:
+            for line in open(links_file):
+                if not line.strip():
+                    continue
+
+                line_split = line.strip().split('\t')
+                if len(line_split) == 2:
+                    link_scaffold_ids.append([line_split[0], (1.0, 0.0, 0.0), line_split[1], (1.0, 0.0, 0.0)])
+                else:
+                    link_scaffold_ids.append([line_split[0],
+                                              [float(x) / 255 for x in line_split[1].split(',')],
+                                              line_split[2],
+                                              [float(x) / 255 for x in line_split[3].split(',')]])
+                                              
+        return link_scaffold_ids
+        
+    def plot(self, 
+                scaffold_stats, 
+                genome_stats,
+                gc_dist,
+                td_dist,
+                plot_options, 
+                highlight_file, 
+                links_file, 
+                individual_plots, 
+                output_dir):
+        """Create outlier plots."""
+        
+        highlight_scaffolds_ids = self._plot_highlight(highlight_file)
+        link_scaffold_ids = self._plot_link(links_file)
+
+        # create plots        
+        genomes_processed = 0
+        genome_plots = defaultdict(list)
+        for genome_id, gs in genome_stats.iteritems():
+            genomes_processed += 1
+
+            if not self.logger.is_silent:
+                sys.stdout.write('  Plotting scaffold distribution for %d of %d (%.1f%%) genomes.\r' %
+                                                                                                (genomes_processed,
+                                                                                                 len(genome_stats),
+                                                                                                 genomes_processed * 100.0 / len(genome_stats)))
+                sys.stdout.flush()
+
+            genome_scaffold_stats = {}
+            for scaffold_id in scaffold_stats.scaffolds_in_genome[genome_id]:
+                genome_scaffold_stats[scaffold_id] = scaffold_stats.stats[scaffold_id]
+
+            if individual_plots:
+                # GC plot
+                gc_plots = GcPlots(plot_options)
+                gc_plots.plot(genome_scaffold_stats, 
+                                highlight_scaffolds_ids, 
+                                link_scaffold_ids, 
+                                gs.mean_gc, 
+                                gc_dist, 
+                                [plot_options.gc_perc])
+
+                output_plot = os.path.join(output_dir, genome_id + '.gc_plots.' + plot_options.image_type)
+                gc_plots.save_plot(output_plot, dpi=plot_options.dpi)
+                gc_plots.save_html(os.path.join(output_dir, genome_id + '.gc_plots.html'))
+
+                # TD plot
+                td_plots = TdPlots(plot_options)
+                td_plots.plot(genome_scaffold_stats, 
+                                highlight_scaffolds_ids, 
+                                link_scaffold_ids, 
+                                gs.mean_signature, 
+                                td_dist, 
+                                [plot_options.td_perc])
+
+                output_plot = os.path.join(output_dir, genome_id + '.td_plots.' + plot_options.image_type)
+                td_plots.save_plot(output_plot, dpi=plot_options.dpi)
+                td_plots.save_html(os.path.join(output_dir, genome_id + '.td_plots.html'))
+
+                # mean absolute deviation of coverage profiles
+                if len(gs.mean_coverage) >= 1:
+                    cov_perc_plots = CovPercPlots(plot_options)
+                    cov_perc_plots.plot(genome_scaffold_stats, 
+                                            highlight_scaffolds_ids, 
+                                            link_scaffold_ids, 
+                                            gs.mean_coverage, 
+                                            [plot_options.cov_perc])
+
+                    output_plot = os.path.join(output_dir, genome_id + '.cov_perc.' + plot_options.image_type)
+                    cov_perc_plots.save_plot(output_plot, dpi=plot_options.dpi)
+                    cov_perc_plots.save_html(os.path.join(output_dir, genome_id + '.cov_perc.html'))
+
+                # coverage correlation plots
+                if len(gs.mean_coverage) > 1:
+                    cov_corr_plots = CovCorrPlots(plot_options)
+                    cov_corr_plots.plot(genome_scaffold_stats, 
+                                            highlight_scaffolds_ids, 
+                                            gs.mean_coverage, 
+                                            [plot_options.cov_corr])
+
+                    output_plot = os.path.join(output_dir, genome_id + '.cov_corr.' + plot_options.image_type)
+                    cov_corr_plots.save_plot(output_plot, dpi=plot_options.dpi)
+                    cov_corr_plots.save_html(os.path.join(output_dir, genome_id + '.cov_corr.html'))
+
+            # combined distribution, GC vs. coverage, and tetranucleotide signature plots
+            combined_plots = CombinedPlots(plot_options)
+            combined_plots.plot(genome_scaffold_stats,
+                                    highlight_scaffolds_ids, 
+                                    link_scaffold_ids, 
+                                    gs,
+                                    gc_dist, 
+                                    td_dist,
+                                    plot_options.gc_perc, 
+                                    plot_options.td_perc, 
+                                    plot_options.cov_perc)
+
+            output_plot = os.path.join(output_dir, genome_id + '.combined.' + plot_options.image_type)
+            combined_plots.save_plot(output_plot, dpi=plot_options.dpi)
+            combined_plots.save_html(os.path.join(output_dir, genome_id + '.combined.html'))
+
+            genome_plots[genome_id].append(('Combined', genome_id + '.combined.html'))
+
+            # combined plot of distributions
+            dist_plots = DistributionPlots(plot_options)
+            dist_plots.plot(genome_scaffold_stats,
+                                highlight_scaffolds_ids,
+                                link_scaffold_ids,
+                                gs,
+                                gc_dist, 
+                                td_dist,
+                                plot_options.gc_perc, 
+                                plot_options.td_perc, 
+                                plot_options.cov_perc)
+
+            output_plot = os.path.join(output_dir, genome_id + '.dist_plot.' + plot_options.image_type)
+            dist_plots.save_plot(output_plot, dpi=plot_options.dpi)
+            dist_plots.save_html(os.path.join(output_dir, genome_id + '.dist_plot.html'))
+
+            genome_plots[genome_id].append(('Distributions', genome_id + '.dist_plot.html'))
+
+            # GC vs. coverage plot
+            if len(gs.mean_coverage) >= 1:
+                gc_cov_plot = GcCovPlot(plot_options)
+                gc_cov_plot.plot(genome_scaffold_stats,
+                                 highlight_scaffolds_ids, link_scaffold_ids,
+                                 gs.mean_gc, gs.mean_coverage)
+
+                output_plot = os.path.join(output_dir, genome_id + '.gc_coverge.' + plot_options.image_type)
+                gc_cov_plot.save_plot(output_plot, dpi=plot_options.dpi)
+                gc_cov_plot.save_html(os.path.join(output_dir, genome_id + '.gc_coverge.html'))
+
+                genome_plots[genome_id].append(('GC vs. coverage', genome_id + '.gc_coverge.html'))
+
+            # tetranucleotide signature PCA plot
+            tetra = TetraPcaPlot(plot_options)
+            tetra.plot(genome_scaffold_stats, highlight_scaffolds_ids, link_scaffold_ids)
+
+            output_plot = os.path.join(output_dir, genome_id + '.tetra_pca.' + plot_options.image_type)
+            tetra.save_plot(output_plot, dpi=plot_options.dpi)
+            tetra.save_html(os.path.join(output_dir, genome_id + '.tetra_pca.html'))
+
+            genome_plots[genome_id].append(('Tetra PCA', genome_id + '.tetra_pca.html'))
+            
+        self.create_html_index(output_dir, genome_plots)
+
+        if not self.logger.is_silent:
+            sys.stdout.write('\n')
+    
     def create_html_index(self, plot_dir, genome_plots):
         """Create HTML index for navigating outlier plots.
 

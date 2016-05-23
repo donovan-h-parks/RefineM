@@ -134,12 +134,16 @@ class BasePlot(AbstractPlot):
         # prettify histogram plot
         self.prettify(axis)
 
-    def scatter(self, axis,
-                     scaffold_stats,
-                     highlight_scaffold_ids,
-                     link_scaffold_ids,
-                     xlabel, ylabel):
-        """Create histogram and scatterplot.
+    def scatter(self, 
+                    axis,
+                    scaffold_stats,
+                    highlight_scaffold_ids,
+                    link_scaffold_ids,
+                    xlabel, ylabel):
+        """Create scatterplot with points rearranged.
+        
+        Points are rearranged to ensure visibility of highlighted
+        points and links.
 
         Parameters
         ----------
@@ -172,7 +176,78 @@ class BasePlot(AbstractPlot):
         # prettify scatterplot
         self.prettify(axis)
 
-        return scatter, labels
+        return scatter, x, y, labels
+        
+    def scatter_fixed_order(self, axis,
+                                x, y, labels,
+                                highlight_scaffold_ids,
+                                link_scaffold_ids,
+                                xlabel, ylabel):
+        """Create scatterplot with points in a fixed order."""
+        
+        colours = []
+        plot_labels = []
+        link_start = {d[0]:d[1] for d in link_scaffold_ids}
+        link_end = {d[2]:d[3] for d in link_scaffold_ids}
+        for label in labels:
+            plot_labels.append('<small>{title}</small>'.format(title=label))
+            
+            if label in highlight_scaffold_ids:
+                colours.append(highlight_scaffold_ids[label])
+            elif label in link_start:
+                colours.append(link_start[label])
+            elif label in link_end:
+                colours.append(link_end[label])
+            else:
+                colours.append((0.7, 0.7, 0.7))
+
+        scatter = axis.scatter(x, y, c=colours, s=self.options.point_size, lw=0.5)
+        axis.set_xlabel(xlabel)
+        axis.set_ylabel(ylabel)
+
+        if link_scaffold_ids:
+            pts = {label:(x[labels.index(label)],y[labels.index(label)]) for label in labels}
+            links = []
+            link_colors = []
+            for id1, c1, id2, _c2 in link_scaffold_ids:
+                pts1 = pts.get(id1, None)
+                pts2 = pts.get(id2, None)
+
+                if pts1 == None or pts2 == None:
+                    continue
+                    
+                links.append((pts1, pts2))
+                link_colors.append(c1 + [1.0])
+            
+            if links:
+                line_segments = LineCollection(links, colors=link_colors)
+                axis.add_collection(line_segments)
+
+        # prettify scatterplot
+        self.prettify(axis)
+
+        return scatter, plot_labels
+        
+    def plot_order(self, labels):
+        """Strip added label information and return raw labels in plot order.
+        
+        Parameters
+        ----------
+        labels : list of str
+            Labels in the order they were plotted, likely decorated with HTML code.
+            
+        Returns
+        -------
+        list of str
+            Raw labels in order they were plotted.
+        """
+        
+        raw_labels = []
+        for label in labels:
+            label = label[label.find('>')+1:label.rfind('<')]
+            raw_labels.append(label)
+            
+        return raw_labels
 
     def save_html(self, output_html):
         """Save figure as HTML.

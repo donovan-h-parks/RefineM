@@ -20,6 +20,7 @@ import mpld3
 
 from biolib.plots.abstract_plot import AbstractPlot
 
+from refinem.plots.scatter import Scatter
 from refinem.plots.gc_plots import GcPlots
 from refinem.plots.td_plots import TdPlots
 from refinem.plots.cov_perc_plots import CovPercPlots
@@ -27,6 +28,7 @@ from refinem.plots.gc_cov_plot import GcCovPlot
 from refinem.plots.tetra_pca_plot import TetraPcaPlot
 from refinem.plots.mpld3_plugins import LinkedBrush, Tooltip
 
+from numpy import (mean as np_mean, abs as np_abs)
 
 class CombinedPlots(AbstractPlot):
     def __init__(self, options):
@@ -70,78 +72,136 @@ class CombinedPlots(AbstractPlot):
         mpld3.plugins.connect(self.fig, mpld3.plugins.MousePosition(fontsize=12, fmt='.1f'))
 
         self.fig.set_size_inches(self.options.width, self.options.height)
+        
+        # create subplots depending on availability of coverage information
+        if len(genome_stats.mean_coverage) >= 1:
+            # note: the ordering here is specific and ensures
+            # proper linked brushing
+            axes_gc_dist = self.fig.add_subplot(241)
+            axes_tetra_dist = self.fig.add_subplot(242)
+            axes_coverage_dist = self.fig.add_subplot(243)
+            axes_td_cov = self.fig.add_subplot(246)
+            axes_pc1_cov = self.fig.add_subplot(247)
+            axes_tetra_pc1_pc3 = self.fig.add_subplot(248)  
+            axes_gc_coverage = self.fig.add_subplot(245)
+            axes_tetra_pc1_pc2 = self.fig.add_subplot(244)            
+        else:
+            # note: the ordering here is specific and ensures
+            # proper linked brushing
+            axes_gc_dist = self.fig.add_subplot(231)
+            axes_tetra_dist = self.fig.add_subplot(234)
+            axes_deltaGC_td = self.fig.add_subplot(232)
+            axes_pc1_td = self.fig.add_subplot(235)
+            axes_tetra_pc1_pc2 = self.fig.add_subplot(233)
+            axes_tetra_pc1_pc3 = self.fig.add_subplot(236)
 
-        axes_gc_dist = self.fig.add_subplot(321)
-        axes_gc_coverage = self.fig.add_subplot(322)
-        axes_tetra_dist = self.fig.add_subplot(323)
-        axes_tetra_pc1_pc2 = self.fig.add_subplot(324)
-        axes_coverage_dist = self.fig.add_subplot(325)
-        axes_tetra_pc1_pc3 = self.fig.add_subplot(326)
-
-        # distribution plots
+        # create plots
         gc_plots = GcPlots(self.options)
-        gc_plots.plot_on_axes(self.fig,
-                                genome_scaffold_stats,
-                                highlight_scaffold_ids,
-                                link_scaffold_ids,
-                                genome_stats.mean_gc,
-                                gc_dist,
-                                [gc_perc],
-                                None,
-                                axes_gc_dist,
-                                True)
-
-        # GC vs. coverage plot
-        gc_cov_plot = GcCovPlot(self.options)
-        gc_cov_plot.plot_on_axes(self.fig,
-                                 genome_scaffold_stats,
-                                 highlight_scaffold_ids,
-                                 link_scaffold_ids,
-                                 genome_stats.mean_gc,
-                                 genome_stats.mean_coverage,
-                                 axes_gc_coverage,
-                                 True)
-
+        scatter, delta_gc, seq_len, label_plot_order = gc_plots.plot_on_axes(self.fig,
+                                                                    genome_scaffold_stats,
+                                                                    highlight_scaffold_ids,
+                                                                    link_scaffold_ids,
+                                                                    genome_stats.mean_gc,
+                                                                    gc_dist,
+                                                                    [gc_perc],
+                                                                    None,
+                                                                    axes_gc_dist,
+                                                                    True)
+                                                                                                     
         td_plots = TdPlots(self.options)
-        td_plots.plot_on_axes(self.fig,
-                                genome_scaffold_stats,
-                                highlight_scaffold_ids,
-                                link_scaffold_ids,
-                                genome_stats.mean_signature,
-                                td_dist,
-                                [td_perc],
-                                None,
-                                axes_tetra_dist,
-                                True)
+        _scatter, td, _, _ = td_plots.plot_on_axes(self.fig,
+                                                    genome_scaffold_stats,
+                                                    highlight_scaffold_ids,
+                                                    link_scaffold_ids,
+                                                    genome_stats.mean_signature,
+                                                    td_dist,
+                                                    [td_perc],
+                                                    None,
+                                                    axes_tetra_dist,
+                                                    True)
+                                
+        if len(genome_stats.mean_coverage) >= 1:
+            cov_per_plots = CovPercPlots(self.options)
+            cov_per_plots.plot_on_axes(self.fig,
+                                        genome_scaffold_stats,
+                                        highlight_scaffold_ids,
+                                        link_scaffold_ids,
+                                        genome_stats.mean_coverage,
+                                        [cov_perc],
+                                        None,
+                                        axes_coverage_dist,
+                                        True)
+                             
+        if len(genome_stats.mean_coverage) >= 1:
+            gc_cov_plot = GcCovPlot(self.options)
+            _, gc, cov, _ = gc_cov_plot.plot_on_axes(self.fig,
+                                                                     genome_scaffold_stats,
+                                                                     highlight_scaffold_ids,
+                                                                     link_scaffold_ids,
+                                                                     genome_stats.mean_gc,
+                                                                     genome_stats.mean_coverage,
+                                                                     axes_gc_coverage,
+                                                                     True) 
 
-        cov_per_plots = CovPercPlots(self.options)
-        scatter = cov_per_plots.plot_on_axes(self.fig,
-                                genome_scaffold_stats,
-                                highlight_scaffold_ids,
-                                link_scaffold_ids,
-                                genome_stats.mean_coverage,
-                                [cov_perc],
-                                None,
-                                axes_coverage_dist,
-                                True)
-
-        # tetranucleotide signature PCA plots
         tetra = TetraPcaPlot(self.options)
-        tetra.plot_on_axes(self.fig, 0, 1,
-                          genome_scaffold_stats,
-                          highlight_scaffold_ids,
-                          link_scaffold_ids,
-                          axes_tetra_pc1_pc2, True)
+        _, pc1, _, _ = tetra.plot_on_axes(self.fig, 0, 1,
+                                                          genome_scaffold_stats,
+                                                          highlight_scaffold_ids,
+                                                          link_scaffold_ids,
+                                                          axes_tetra_pc1_pc2, True)
 
         tetra.plot_on_axes(self.fig, 0, 2,
-                          genome_scaffold_stats,
-                          highlight_scaffold_ids,
-                          link_scaffold_ids,
-                          axes_tetra_pc1_pc3, True)
+                              genome_scaffold_stats,
+                              highlight_scaffold_ids,
+                              link_scaffold_ids,
+                              axes_tetra_pc1_pc3, True)
+             
+        if len(genome_stats.mean_coverage) >= 1:
+            td_cov_plot = Scatter(self.options)  
+            td_cov_plot.plot_on_axes(self.fig,
+                                        td, cov, label_plot_order,
+                                        'tetranucleotide distance',
+                                        'Coverage (mean = %.1f)' % np_mean(genome_stats.mean_coverage),
+                                        highlight_scaffold_ids,
+                                        link_scaffold_ids,
+                                        axes_td_cov,
+                                        True)
+                                             
+            pc1_cov_plot = Scatter(self.options)                                     
+            pc1_cov_plot.plot_on_axes(self.fig,
+                                        pc1, cov, label_plot_order,
+                                        'PC 1 (%.1f%%)' % (tetra.variance[0] * 100),
+                                        'Coverage (mean = %.1f)' % np_mean(genome_stats.mean_coverage),
+                                        highlight_scaffold_ids,
+                                        link_scaffold_ids,
+                                        axes_pc1_cov,
+                                        True)
+        else:
+            deltaGC_td_plot = Scatter(self.options)  
+            deltaGC_td_plot.plot_on_axes(self.fig,
+                                        np_abs(delta_gc), td, label_plot_order,
+                                        '|delta GC| (mean = %.1f)' % genome_stats.mean_gc,
+                                        'tetranucleotide distance',
+                                        highlight_scaffold_ids,
+                                        link_scaffold_ids,
+                                        axes_deltaGC_td,
+                                        True)
+                                        
+            pc1_td_plot = Scatter(self.options)                                     
+            pc1_td_plot.plot_on_axes(self.fig,
+                                        pc1, 
+                                        td, 
+                                        label_plot_order,
+                                        'PC 1 (%.1f%%)' % (tetra.variance[0] * 100),
+                                        'tetranucleotide distance',
+                                        highlight_scaffold_ids,
+                                        link_scaffold_ids,
+                                        axes_pc1_td,
+                                        True)
 
         mpld3.plugins.connect(self.fig, mpld3.plugins.LinkedBrush(scatter))
 
-        self.fig.tight_layout(pad=1, w_pad=2, h_pad=2)
+        self.fig.tight_layout(pad=1.0, w_pad=0.1, h_pad=0.1)
         self.draw()
 
     def save_html(self, output_html):

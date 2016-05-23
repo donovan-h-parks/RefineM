@@ -31,6 +31,45 @@ class CovPercPlots(BasePlot):
     def __init__(self, options):
         """Initialize."""
         BasePlot.__init__(self, options)
+        
+    def _mean_perc_diffs(self, genome_scaffold_stats, mean_coverage):
+        """Calculate percent difference of coverage profiles for each scaffold."""
+        
+        mean_perc_diffs = []
+        for stats in genome_scaffold_stats.values():
+            mean_perc_diff = []
+            for cov_genome, cov_scaffold in itertools.izip(mean_coverage, stats.coverage):
+                if cov_genome == 0:
+                    mean_perc_diff.append(0)
+                elif len(mean_coverage) >= 2:
+                    mean_perc_diff.append(abs(cov_scaffold - cov_genome) * 100 / cov_genome)
+                else:
+                    mean_perc_diff.append((cov_scaffold - cov_genome) * 100 / cov_genome)
+
+            mean_perc_diffs.append(np.mean(mean_perc_diff))
+            
+        return mean_perc_diffs
+        
+    def data_pts(self, genome_scaffold_stats, mean_coverage):
+        """Get data points to plot.
+
+        Parameters
+        ----------
+        genome_scaffold_stats : d[scaffold_id] -> namedtuple of scaffold stats
+          Statistics for scaffolds in genome.
+          
+        Returns
+        -------
+        dict : d[scaffold_id] -> (x, y)
+        """
+        
+        mean_perc_diffs = self._mean_perc_diffs(genome_scaffold_stats, mean_coverage)
+        
+        pts = {}
+        for i, (scaffold_id, stats) in enumerate(genome_scaffold_stats.iteritems()):
+            pts[scaffold_id] = (mean_perc_diffs[i], stats.length / 1000.0)
+            
+        return pts
 
     def plot(self, genome_scaffold_stats,
              highlight_scaffold_ids, link_scaffold_ids,
@@ -97,47 +136,31 @@ class CovPercPlots(BasePlot):
         """
 
         # calculate percent difference of coverage profiles for each scaffold
-        mean_perc_diffs = []
-        for stats in genome_scaffold_stats.values():
-
-            mean_perc_diff = []
-            for cov_genome, cov_scaffold in itertools.izip(mean_coverage, stats.coverage):
-                if cov_genome == 0:
-                    mean_perc_diff.append(0)
-                elif len(mean_coverage) >= 2:
-                    mean_perc_diff.append(abs(cov_scaffold - cov_genome) * 100 / cov_genome)
-                else:
-                    mean_perc_diff.append((cov_scaffold - cov_genome) * 100 / cov_genome)
-
-            mean_perc_diffs.append(np.mean(mean_perc_diff))
+        mean_perc_diffs = self._mean_perc_diffs(genome_scaffold_stats, mean_coverage)
 
         # histogram plot
         if axes_hist:
             axes_hist.hist(mean_perc_diffs, bins=20, color=(0.5, 0.5, 0.5))
             if len(mean_coverage) >= 2:
-                axes_hist.set_xlabel('absolute mean percentage error of coverage')
+                axes_hist.set_xlabel('coverage error')
             else:
-                axes_hist.set_xlabel('mean percentage error of coverage')
+                axes_hist.set_xlabel('coverage error')
 
             axes_hist.set_ylabel('# scaffolds (out of %d)' % len(mean_perc_diffs))
             self.prettify(axes_hist)
 
         # scatterplot
-        if len(mean_coverage) >= 2:
-            xlabel = 'absolute mean percentage error of coverage (mean coverage = %.1f)' % np.mean(mean_coverage)
-        else:
-            xlabel = 'mean percentage error of coverage (mean coverage = %.1f)' % np.mean(mean_coverage)
+        xlabel = 'coverage error (mean = %.1f)' % np.mean(mean_coverage)
         ylabel = 'Scaffold length (kbp)'
 
-        scaffold_stats = {}
-        for i, (scaffold_id, stats) in enumerate(genome_scaffold_stats.iteritems()):
-            scaffold_stats[scaffold_id] = (mean_perc_diffs[i], stats.length / 1000.0)
+        pts = self.data_pts(genome_scaffold_stats, mean_coverage)
 
-        scatter, labels = self.scatter(axes_scatter,
-                                         scaffold_stats,
-                                         highlight_scaffold_ids,
-                                         link_scaffold_ids,
-                                         xlabel, ylabel)
+        scatter, x, y, labels = self.scatter(axes_scatter,
+                                                pts,
+                                                highlight_scaffold_ids,
+                                                link_scaffold_ids,
+                                                xlabel, 
+                                                ylabel)
 
         _, ymax = axes_scatter.get_ylim()
         xmin, xmax = axes_scatter.get_xlim()
@@ -167,4 +190,4 @@ class CovPercPlots(BasePlot):
             tooltip = Tooltip(scatter, labels=labels, hoffset=5, voffset=-15)
             mpld3.plugins.connect(figure, tooltip)
 
-        return scatter
+        return scatter, x, y, self.plot_order(labels)

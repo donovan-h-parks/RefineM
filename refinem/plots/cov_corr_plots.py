@@ -32,6 +32,44 @@ class CovCorrPlots(BasePlot):
     def __init__(self, options):
         """Initialize."""
         BasePlot.__init__(self, options)
+        
+    def _correlation(self, genome_scaffold_stats, mean_coverage):
+        """Calculate percent deviant of coverage profiles for each scaffold."""
+        
+        correlations = []
+        for stats in genome_scaffold_stats.values():
+            corr_r = 1.0
+            if len(mean_coverage) >= 1:
+                corr_r, _corr_p = pearsonr(mean_coverage, stats.coverage)
+                if np.isnan(corr_r):
+                    # both coverage profiles contain identical values,
+                    # e.g. pearsonr([1,1,1],[2,2,2]) -> exception
+                    corr_r = 1.0
+
+            correlations.append(corr_r)
+            
+        return correlations
+        
+    def data_pts(self, genome_scaffold_stats, mean_coverage):
+        """Get data points to plot.
+
+        Parameters
+        ----------
+        genome_scaffold_stats : d[scaffold_id] -> namedtuple of scaffold stats
+          Statistics for scaffolds in genome.
+          
+        Returns
+        -------
+        dict : d[scaffold_id] -> (x, y)
+        """
+        
+        correlations = self._correlation(genome_scaffold_stats, mean_coverage)
+        
+        pts = {}
+        for i, (scaffold_id, stats) in enumerate(genome_scaffold_stats.iteritems()):
+            scaffold_stats[scaffold_id] = (correlations[i], stats.length / 1000.0)
+            
+        return pts
 
     def plot(self, genome_scaffold_stats,
              highlight_scaffold_ids, link_scaffold_ids,
@@ -98,17 +136,7 @@ class CovCorrPlots(BasePlot):
         """
 
         # calculate percent deviant of coverage profiles for each scaffold
-        correlations = []
-        for stats in genome_scaffold_stats.values():
-            corr_r = 1.0
-            if len(mean_coverage) >= 1:
-                corr_r, _corr_p = pearsonr(mean_coverage, stats.coverage)
-                if np.isnan(corr_r):
-                    # both coverage profiles contain identical values,
-                    # e.g. pearsonr([1,1,1],[2,2,2]) -> exception
-                    corr_r = 1.0
-
-            correlations.append(corr_r)
+        correlations = self._correlation(genome_scaffold_stats, mean_coverage)
 
         # histogram plot
         if axes_hist:
@@ -121,15 +149,14 @@ class CovCorrPlots(BasePlot):
         xlabel = "coverage correlation\n(Pearson's $r$)"
         ylabel = 'Scaffold length (kbp)'
 
-        scaffold_stats = {}
-        for i, (scaffold_id, stats) in enumerate(genome_scaffold_stats.iteritems()):
-            scaffold_stats[scaffold_id] = (correlations[i], stats.length / 1000.0)
+        pts = self.data_pts(genome_scaffold_stats, mean_coverage)
 
-        scatter, labels = self.scatter(axes_scatter,
-                                         scaffold_stats,
-                                         highlight_scaffold_ids,
-                                         link_scaffold_ids,
-                                         xlabel, ylabel)
+        scatter, x, y, labels = self.scatter(axes_scatter,
+                                             pts,
+                                             highlight_scaffold_ids,
+                                             link_scaffold_ids,
+                                             xlabel, 
+                                             ylabel)
 
         _, ymax = axes_scatter.get_ylim()
         xmin, xmax = axes_scatter.get_xlim()
@@ -155,4 +182,4 @@ class CovCorrPlots(BasePlot):
             tooltip = Tooltip(scatter, labels=labels, hoffset=5, voffset=-15)
             mpld3.plugins.connect(figure, tooltip)
 
-        return scatter
+        return scatter, x, y, self.plot_order(labels)
