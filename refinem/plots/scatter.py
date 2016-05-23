@@ -78,7 +78,8 @@ class Scatter(BasePlot):
         """
 
         scatter, labels = self.scatter_fixed_order(axis, 
-                                                    x, y, pt_labels,
+                                                    x, y, 
+                                                    pt_labels,
                                                     highlight_scaffold_ids, 
                                                     link_scaffold_ids,
                                                     xlabel, 

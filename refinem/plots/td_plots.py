@@ -142,11 +142,11 @@ class TdPlots(BasePlot):
 
         pts = self.data_pts(genome_scaffold_stats, mean_signature)
             
-        scatter, x_pts, y_pts, labels = self.scatter(axes_scatter,
-                                                     pts,
-                                                     highlight_scaffold_ids,
-                                                     link_scaffold_ids,
-                                                     xlabel, ylabel)
+        scatter, x_pts, y_pts, plot_labels = self.scatter(axes_scatter,
+                                                             pts,
+                                                             highlight_scaffold_ids,
+                                                             link_scaffold_ids,
+                                                             xlabel, ylabel)
 
         _, ymax = axes_scatter.get_ylim()
         xmin, xmax = axes_scatter.get_xlim()
@@ -193,7 +193,7 @@ class TdPlots(BasePlot):
 
         # tooltips plugin
         if tooltip_plugin:
-            tooltip = Tooltip(scatter, labels=labels, hoffset=5, voffset=-15)
+            tooltip = Tooltip(scatter, labels=plot_labels, hoffset=5, voffset=-15)
             mpld3.plugins.connect(figure, tooltip)
 
-        return scatter, x_pts, y_pts, self.plot_order(labels)
+        return scatter, x_pts, y_pts, self.plot_order(plot_labels)

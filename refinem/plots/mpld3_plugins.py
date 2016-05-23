@@ -269,7 +269,8 @@ class Tooltip(mpld3.plugins.PluginBase):
                     '<div id="selected_points"></div>\n'
                     '<br>\n'
                     '<button onclick="clear_selection_list()">Clear</button>\n')
-                    
+            
+            
 class LinkedBrushSave(mpld3.plugins.PluginBase):
     JAVASCRIPT="""
       mpld3.LinkedBrushSavePlugin = mpld3_LinkedBrushSavePlugin;

@@ -28,7 +28,7 @@ from biolib.plots.abstract_plot import AbstractPlot
 
 class DistributionPlots(AbstractPlot):
     def __init__(self, options):
-        """Initialize."""
+        """Initialize plot."""
         AbstractPlot.__init__(self, options)
 
     def plot(self, genome_scaffold_stats,

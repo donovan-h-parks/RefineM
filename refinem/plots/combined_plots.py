@@ -30,6 +30,7 @@ from refinem.plots.mpld3_plugins import LinkedBrush, Tooltip
 
 from numpy import (mean as np_mean, abs as np_abs)
 
+
 class CombinedPlots(AbstractPlot):
     def __init__(self, options):
         """Initialize."""

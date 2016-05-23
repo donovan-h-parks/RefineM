@@ -175,19 +175,19 @@ class TetraPcaPlot(BasePlot):
         xlabel = 'PC %d (%.1f%%)' % (pc_xaxis + 1, self.variance[pc_xaxis] * 100)
         ylabel = 'PC %d (%.1f%%)' % (pc_yaxis + 1, self.variance[pc_yaxis] * 100)
 
-        scatter, x, y, labels = self.scatter(axis, 
-                                                pts,
-                                                highlight_scaffold_ids, 
-                                                link_scaffold_ids,
-                                                xlabel, 
-                                                ylabel)
+        scatter, x, y, plot_labels = self.scatter(axis, 
+                                                    pts,
+                                                    highlight_scaffold_ids, 
+                                                    link_scaffold_ids,
+                                                    xlabel, 
+                                                    ylabel)
 
         # tooltips plugin
         if tooltip_plugin:
-            tooltip = Tooltip(scatter, labels=labels, hoffset=5, voffset=-15)
+            tooltip = Tooltip(scatter, labels=plot_labels, hoffset=5, voffset=-15)
             mpld3.plugins.connect(figure, tooltip)
 
-        return scatter, x, y, self.plot_order(labels)
+        return scatter, x, y, self.plot_order(plot_labels)
 
     def plot_variance(self, axis):
         """Create plot of variance captured by each principal component.

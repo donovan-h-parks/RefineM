@@ -151,12 +151,12 @@ class CovCorrPlots(BasePlot):
 
         pts = self.data_pts(genome_scaffold_stats, mean_coverage)
 
-        scatter, x, y, labels = self.scatter(axes_scatter,
-                                             pts,
-                                             highlight_scaffold_ids,
-                                             link_scaffold_ids,
-                                             xlabel, 
-                                             ylabel)
+        scatter, x, y, plot_labels = self.scatter(axes_scatter,
+                                                     pts,
+                                                     highlight_scaffold_ids,
+                                                     link_scaffold_ids,
+                                                     xlabel, 
+                                                     ylabel)
 
         _, ymax = axes_scatter.get_ylim()
         xmin, xmax = axes_scatter.get_xlim()
@@ -179,7 +179,7 @@ class CovCorrPlots(BasePlot):
 
         # tooltips plugin
         if tooltip_plugin:
-            tooltip = Tooltip(scatter, labels=labels, hoffset=5, voffset=-15)
+            tooltip = Tooltip(scatter, labels=plot_labels, hoffset=5, voffset=-15)
             mpld3.plugins.connect(figure, tooltip)
 
-        return scatter, x, y, self.plot_order(labels)
+        return scatter, x, y, self.plot_order(plot_labels)

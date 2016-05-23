@@ -183,7 +183,18 @@ class BasePlot(AbstractPlot):
                                 highlight_scaffold_ids,
                                 link_scaffold_ids,
                                 xlabel, ylabel):
-        """Create scatterplot with points in a fixed order."""
+        """Create scatterplot with points in a fixed order.
+        
+        The current method for doing plotting is a little hacky
+        in order to ensure correct linked brushing. Linked brushing
+        requires points along an axis to be in identical ordering. 
+        The function scatter() is problematic for this since it 
+        reorders the points so those being highlighted or
+        linked are plotted last (i.e., on top).
+        
+        This function does no such reordering and essentially
+        expects any required reordering to already have been done.
+        """
         
         colours = []
         plot_labels = []
