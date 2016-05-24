@@ -261,8 +261,8 @@ class OptionsParser():
             
             self.logger.info('Outlier plots written to: ' + plot_dir)
 
-    def cluster(self, options):
-        """Cluster command"""
+    def kmeans(self, options):
+        """kmeans command"""
         
         check_file_exists(options.scaffold_stats_file)
         check_file_exists(options.genome_file)
@@ -273,15 +273,39 @@ class OptionsParser():
         scaffold_stats.read(options.scaffold_stats_file)
 
         cluster = Cluster(options.cpus)
-        cluster.run(scaffold_stats,
-                    options.num_clusters,
-                    options.num_components,
-                    options.K,
-                    options.no_coverage,
-                    options.no_pca,
-                    options.iterations,
-                    options.genome_file,
-                    options.output_dir)
+        cluster.kmeans(scaffold_stats,
+                        options.num_clusters,
+                        options.num_components,
+                        options.K,
+                        options.no_coverage,
+                        options.no_pca,
+                        options.iterations,
+                        options.genome_file,
+                        options.output_dir)
+
+        self.logger.info('Partitioned sequences written to: ' + options.output_dir)
+        
+    def dbscan(self, options):
+        """dbscan command"""
+        
+        check_file_exists(options.scaffold_stats_file)
+        check_file_exists(options.genome_file)
+        make_sure_path_exists(options.output_dir)
+
+        self.logger.info('Reading scaffold statistics.')
+        scaffold_stats = ScaffoldStats()
+        scaffold_stats.read(options.scaffold_stats_file)
+
+        cluster = Cluster(options.cpus)
+        cluster.dbscan(scaffold_stats,
+                        options.num_clusters,
+                        options.num_components,
+                        options.min_pts,
+                        options.dist_frac,
+                        options.no_coverage,
+                        options.no_pca,
+                        options.genome_file,
+                        options.output_dir)
 
         self.logger.info('Partitioned sequences written to: ' + options.output_dir)
 
@@ -493,8 +517,10 @@ class OptionsParser():
             self.gene_profile(options)
         elif(options.subparser_name == 'outliers'):
             self.outliers(options)
-        elif(options.subparser_name == 'cluster'):
-            self.cluster(options)
+        elif(options.subparser_name == 'kmeans'):
+            self.kmeans(options)
+        elif(options.subparser_name == 'dbscan'):
+            self.dbscan(options)
         elif(options.subparser_name == 'reference'):
             self.reference(options)
         elif(options.subparser_name == 'compatible'):

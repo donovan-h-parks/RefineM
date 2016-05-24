@@ -78,8 +78,16 @@ class Cluster():
 
         return pc, variance
 
-    def run(self, scaffold_stats, num_clusters, num_components, K, no_coverage, no_pca, iterations, genome_file, output_dir):
-        """Calculate statistics for genomes.
+    def kmeans(self, scaffold_stats, 
+                        num_clusters, 
+                        num_components, 
+                        min_pts, 
+                        dist_frac, 
+                        no_coverage, 
+                        no_pca,
+                        genome_file, 
+                        output_dir):
+        """Cluster genome with k-means.
 
         Parameters
         ----------
@@ -89,14 +97,14 @@ class Cluster():
             Number of cluster to form.
         num_components : int
             Number of PCA components to consider.
-        K : int
-            K-mer size to use for calculating genomic signature.
+        min_pts : int
+            Minimum number of neighbour points (scaffolds) required to be a core point.
+        dist_frac : float
+            Fraction of median distance used to define neighbours.
         no_coverage : boolean
             Flag indicating if coverage information should be used during clustering.
         no_pca : boolean
             Flag indicating if PCA of genomic signature should be calculated.
-        iterations : int
-            Iterations of clustering to perform.
         genome_file : str
             Sequences being clustered.
         output_dir : str
@@ -172,3 +180,30 @@ class Cluster():
                 fout.write('>' + seq_id + '\n')
                 fout.write(seqs[seq_id] + '\n')
             fout.close()
+            
+    def dbscan(self, scaffold_stats, num_clusters, num_components, K, no_coverage, no_pca, iterations, genome_file, output_dir):
+        """Cluster genome with DBSCAN.
+
+        Parameters
+        ----------
+        scaffold_stats : ScaffoldStats
+            Statistics for individual scaffolds.
+        num_clusters : int
+            Number of cluster to form.
+        num_components : int
+            Number of PCA components to consider.
+        K : int
+            K-mer size to use for calculating genomic signature.
+        no_coverage : boolean
+            Flag indicating if coverage information should be used during clustering.
+        no_pca : boolean
+            Flag indicating if PCA of genomic signature should be calculated.
+        iterations : int
+            Iterations of clustering to perform.
+        genome_file : str
+            Sequences being clustered.
+        output_dir : str
+            Directory to write results.
+        """
+        
+        pass
