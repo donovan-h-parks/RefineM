@@ -1,0 +1,9 @@
+include LICENSE
+include setup.py
+include README.md
+include README.rst
+include MANIFEST.in
+include bin refinem
+include refinem VERSION
+recursive-include refinem *.py *.txt
+
