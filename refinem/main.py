@@ -22,7 +22,8 @@ from collections import defaultdict
 
 from refinem.scaffold_stats import ScaffoldStats
 from refinem.genome_stats import GenomeStats
-from refinem.gene_profile import GeneProfile
+from refinem.taxon_profile import TaxonProfile
+from refinem.ssu import SSU
 from refinem.bin_comparer import BinComparer
 from refinem.reference import Reference
 from refinem.unbinned import Unbinned
@@ -44,7 +45,8 @@ import biolib.genome_tk as genome_tk
 from biolib.common import (make_sure_path_exists,
                            check_dir_exists,
                            check_file_exists,
-                           query_yes_no)
+                           query_yes_no,
+                           remove_extension)
 from biolib.external.prodigal import Prodigal
 from biolib.external.execute import check_dependencies
 
@@ -100,6 +102,9 @@ class OptionsParser():
         """
 
         for seq_file in seq_files:
+            if os.stat(seq_file).st_size == 0:
+                continue
+                
             if not seq_io.is_nucleotide(seq_file):
                 print('Expected all files to contain sequences in nucleotide space.')
                 print('File %s appears like it may contain amino acids sequences.' % seq_file)
@@ -125,6 +130,9 @@ class OptionsParser():
         """
 
         for seq_file in seq_files:
+            if os.stat(seq_file).st_size == 0:
+                continue
+                
             if not seq_io.is_protein(seq_file):
                 print('Expected all files to contain sequences in amino acid space.')
                 print('File %s appears like it may contain nucleotide sequences.' % seq_file)
@@ -196,7 +204,7 @@ class OptionsParser():
 
         self.logger.info('Genome statistic written to: %s' % options.output_file)
 
-    def gene_profile(self, options):
+    def taxon_profile(self, options):
         """Call genes command"""
         
         make_sure_path_exists(options.output_dir)
@@ -210,17 +218,44 @@ class OptionsParser():
             sys.exit()
 
         # build gene profile
-        gene_profile = GeneProfile(options.cpus, options.output_dir)
-        gene_profile.run(gene_files,
+        taxon_profile = TaxonProfile(options.cpus, options.output_dir)
+        taxon_profile.run(gene_files,
                             options.scaffold_stats_file,
                             options.db_file,
                             options.taxonomy_file,
                             options.per_to_classify,
                             options.evalue,
                             options.per_identity,
-                            options.per_aln_len)
+                            options.per_aln_len,
+                            options.tmpdir)
 
         self.logger.info('Results written to: %s' % options.output_dir)
+        
+    def taxon_filter(self, options):
+        """Taxon filter command"""
+        
+        make_sure_path_exists(options.taxon_profile_dir)
+
+        # build gene profile
+        taxon_profile = TaxonProfile(options.cpus, options.taxon_profile_dir)
+        
+        if False:
+            taxon_profile.filter(options.genome_threshold,
+                                options.min_scaffold_agreement,
+                                options.max_scaffold_disagreement,
+                                options.min_classified_per,
+                                options.output_file)
+        else:
+            taxon_profile.filter(options.consensus_taxon,
+                                options.trusted_scaffold,
+                                options.common_taxa,
+                                options.congruent_scaffold,
+                                options.min_classified_per,
+                                options.min_classified,
+                                options.consensus_scaffold,
+                                options.output_file)
+
+        self.logger.info('Results written to: %s' % options.output_file)
 
     def outliers(self, options):
         """Outlier command"""
@@ -260,6 +295,45 @@ class OptionsParser():
                             plot_dir)
             
             self.logger.info('Outlier plots written to: ' + plot_dir)
+            
+    def ssu_erroneous(self, options):
+        """Erroneous SSU command"""
+        
+        check_dependencies(('nhmmer', 'blastn'))
+
+        check_dir_exists(options.genome_nt_dir)
+        check_dir_exists(options.taxon_profile_dir)
+        
+        make_sure_path_exists(options.output_dir)
+        
+        genome_files = self._genome_files(options.genome_nt_dir, options.genome_ext)
+        if not self._check_nuclotide_seqs(genome_files):
+            self.logger.warning('All files must contain nucleotide sequences.')
+            sys.exit()
+             
+        # identify scaffolds with 16S sequences
+        ssu = SSU(options.cpus)
+        ssu_hits = ssu.identify(genome_files, options.evalue, options.concatenate, options.output_dir)
+        ssu_seq_files = ssu.extract(genome_files, ssu_hits, options.output_dir)
+        ssu_classifications = ssu.classify(ssu_seq_files, options.ssu_db, options.ssu_taxonomy_file, options.evalue, options.output_dir)
+        
+        # report statistics for SSU scaffolds
+        self.logger.info('Identifying scaffolds with 16S rRNA genes with divergent taxonomic classification.')
+
+        ssu.erroneous(ssu_hits,
+                        ssu_classifications,
+                        options.taxon_profile_dir,
+                        options.common_taxon,
+                        options.ssu_min_len,
+                        options.ssu_domain,
+                        options.ssu_phylum,
+                        options.ssu_class,
+                        options.ssu_order,
+                        options.ssu_family,
+                        options.ssu_genus,
+                        options.output_dir)
+            
+        self.logger.info('SSU information written to: ' + options.output_dir)
 
     def kmeans(self, options):
         """kmeans command"""
@@ -306,6 +380,62 @@ class OptionsParser():
                         options.no_pca,
                         options.genome_file,
                         options.output_dir)
+
+        self.logger.info('Partitioned sequences written to: ' + options.output_dir)
+        
+    def split(self, options):
+        """Split command"""
+        
+        check_file_exists(options.scaffold_stats_file)
+        check_file_exists(options.genome_file)
+        make_sure_path_exists(options.output_dir)
+
+        self.logger.info('Reading scaffold statistics.')
+        scaffold_stats = ScaffoldStats()
+        scaffold_stats.read(options.scaffold_stats_file)
+
+        cluster = Cluster(1)
+        cluster.split(scaffold_stats,
+                        options.criteria1,
+                        options.criteria2,
+                        options.genome_file,
+                        options.output_dir)
+
+        self.logger.info('Partitioned sequences written to: ' + options.output_dir)
+        
+    def manual(self, options):
+        """Manual command"""
+        
+        check_file_exists(options.cluster_file)
+        check_file_exists(options.genome_file)
+        make_sure_path_exists(options.output_dir)
+        
+        genome_id = remove_extension(options.genome_file)
+
+        seqs = seq_io.read(options.genome_file)
+        fout = {}
+        with open(options.cluster_file) as f:
+            f.readline()
+            
+            for line in f:
+                line_split = line.rstrip().split('\t')
+                scaffold_id = line_split[0]
+                cluster_id = int(line_split[1])
+                
+                if cluster_id < 0:
+                    # negative values indicate scaffolds that should
+                    # not be placed in a cluster
+                    continue
+                    
+                if cluster_id not in fout:
+                    fout[cluster_id] = open(os.path.join(options.output_dir, genome_id + '_c%d.fna' % cluster_id), 'w')
+                    
+                f = fout[cluster_id]
+                f.write('>' + scaffold_id + '\n')
+                f.write(seqs[scaffold_id] + '\n')
+                
+        for f in fout.values():
+            f.close()
 
         self.logger.info('Partitioned sequences written to: ' + options.output_dir)
 
@@ -363,8 +493,8 @@ class OptionsParser():
 
         self.logger.info('Results written to: ' + output_file)
 
-    def modify(self, options):
-        """Modify command"""
+    def modify_bin(self, options):
+        """Modify bin command"""
 
         make_sure_path_exists(os.path.dirname(options.output_genome))
 
@@ -409,6 +539,24 @@ class OptionsParser():
                 print '    %s' % seq_id
 
         self.logger.info('Modified genome written to: ' + options.output_genome)
+        
+    def filter_bins(self, options):
+        """Filter bins command"""
+        
+        make_sure_path_exists(options.output_dir)
+        
+        genome_files = self._genome_files(options.genome_nt_dir, options.genome_ext)
+        if not self._check_nuclotide_seqs(genome_files):
+            self.logger.warning('All files must contain nucleotide sequences.')
+            sys.exit()
+
+        outliers = Outliers()
+        for genome_file in genome_files:
+            gf = remove_extension(genome_file) + '.filtered.' + options.genome_ext
+            out_genome = os.path.join(options.output_dir, gf)
+            outliers.remove_outliers(genome_file, options.filter_file, out_genome, options.modified_only)
+
+        self.logger.info('Modified genome written to: ' + options.output_dir)
 
     def call_genes(self, options):
         """Call genes command"""
@@ -513,14 +661,22 @@ class OptionsParser():
             self.scaffold_stats(options)
         elif(options.subparser_name == 'genome_stats'):
             self.genome_stats(options)
-        elif(options.subparser_name == 'gene_profile'):
-            self.gene_profile(options)
+        elif(options.subparser_name == 'taxon_profile'):
+            self.taxon_profile(options)
+        elif(options.subparser_name == 'taxon_filter'):
+            self.taxon_filter(options)
         elif(options.subparser_name == 'outliers'):
             self.outliers(options)
+        elif(options.subparser_name == 'ssu_erroneous'):
+            self.ssu_erroneous(options)
         elif(options.subparser_name == 'kmeans'):
             self.kmeans(options)
         elif(options.subparser_name == 'dbscan'):
             self.dbscan(options)
+        elif(options.subparser_name == 'split'):
+            self.split(options)
+        elif(options.subparser_name == 'manual'):
+            self.manual(options)
         elif(options.subparser_name == 'reference'):
             self.reference(options)
         elif(options.subparser_name == 'compatible'):
@@ -529,8 +685,10 @@ class OptionsParser():
             self.unique(options)
         elif(options.subparser_name == 'bin_compare'):
             self.bin_compare(options)
-        elif(options.subparser_name == 'modify'):
-            self.modify(options)
+        elif(options.subparser_name == 'modify_bin'):
+            self.modify_bin(options)
+        elif(options.subparser_name == 'filter_bins'):
+            self.filter_bins(options)
         elif(options.subparser_name == 'call_genes'):
             self.call_genes(options)
         elif(options.subparser_name == 'unbinned'):

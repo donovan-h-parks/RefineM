@@ -26,7 +26,6 @@ from biolib.common import remove_extension
 
 import biolib.seq_io as seq_io
 
-
 def concatenate_gene_files(gene_files, concatenated_gene_file):
     """Combine all gene files into a single file.
 
@@ -47,7 +46,7 @@ def concatenate_gene_files(gene_files, concatenated_gene_file):
         genome_id = remove_extension(gf)
 
         for seq_id, seq in seq_io.read_seq(gf):
-            fout.write('>' + seq_id + '~' + genome_id + '\n')
+            fout.write('>' + genome_id + '~' + seq_id + '\n')
             if seq[-1] == '*':
                 seq = seq[0:-1]
             fout.write(seq + '\n')

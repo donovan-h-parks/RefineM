@@ -207,3 +207,72 @@ class Cluster():
         """
         
         pass
+        
+    def split(self, scaffold_stats, criteria1, criteria2, genome_file, output_dir):
+        """Split genome into two based ongenomic feature.
+
+        Parameters
+        ----------
+        scaffold_stats : ScaffoldStats
+            Statistics for individual scaffolds.
+        criteria1 : str
+            First criteria used for splitting genome.
+        criteria2 : str
+           Second criteria used for splitting genome.
+        genome_file : str
+            Sequences being clustered.
+        output_dir : str
+            Directory to write results.
+        """
+        
+        seqs = seq_io.read(genome_file)
+        
+        # calculate PCA if necessary
+        if 'pc' in criteria1 or 'pc' in criteria2:
+            self.logger.info('Performing PCA.')
+            signatures = GenomicSignature(K)
+            signature_matrix = []
+            seqs = seq_io.read(genome_file)
+            for seq_id, seq in seqs.iteritems():
+                stats = scaffold_stats.stats[seq_id]
+
+                signature_matrix.append(stats.signature)
+
+            pc, _variance = self.pca(signature_matrix)
+            for i, seq_id in enumerate(seqs):
+                scaffold_stats.stats[seq_id].pc1 = pc[i][0]
+                scaffold_stats.stats[seq_id].pc2 = pc[i][1]
+                scaffold_stats.stats[seq_id].pc3 = pc[i][2]
+                
+        # split bin
+        genome_id = remove_extension(genome_file)
+        fout1 = open(os.path.join(output_dir, genome_id + '_c1.fna'), 'w')
+        fout2 = open(os.path.join(output_dir, genome_id + '_c2.fna'), 'w')
+
+        for seq_id, seq in seqs.iteritems():
+            stats = scaffold_stats.stats[seq_id]
+            
+            meet_criteria = True
+            for criteria in [criteria1, criteria2]:
+                if 'gc' in criteria:
+                    v = eval(criteria.replace('gc', str(stats.gc)), {"__builtins__": {}})
+                elif 'coverage' in criteria:
+                    v = eval(criteria.replace('coverage', str(stats.coverage)), {"__builtins__": {}})
+                elif 'pc1' in criteria:
+                    v = eval(criteria.replace('pc1', str(stats.pc1)), {"__builtins__": {}})
+                elif 'pc2' in criteria:
+                    v = eval(criteria.replace('pc2', str(stats.pc2)), {"__builtins__": {}})
+                elif 'pc3' in criteria:
+                    v = eval(criteria.replace('pc3', str(stats.pc3)), {"__builtins__": {}})
+                    
+                meet_criteria = meet_criteria and v
+            
+            if meet_criteria:
+                fout1.write('>' + seq_id + '\n')
+                fout1.write(seqs[seq_id] + '\n')
+            else:
+                fout2.write('>' + seq_id + '\n')
+                fout2.write(seqs[seq_id] + '\n')
+            
+        fout1.close()
+        fout2.close()        

@@ -29,6 +29,7 @@ import sys
 import tempfile
 import argparse
 
+from refinem import version
 from refinem.main import OptionsParser
 
 from biolib.common import make_sure_path_exists
@@ -48,14 +49,6 @@ To Do:
    that this bin doesn't have an mer gene).
 """
 
-
-def version():
-    """Read program version from file."""
-    import refinem
-    version_file = open(os.path.join(refinem.__path__[0], 'VERSION'))
-    return version_file.read().strip()
-
-
 def print_help():
     """Help menu."""
 
@@ -68,9 +61,10 @@ def print_help():
      genome_stats   -> Calculate statistics for genomes
 
     Reduce contamination:
-     gene_profile   -> Generate a taxonomic profile from the genes within a genome
      outliers       -> Identify scaffolds with divergent GC, coverage, or tetranucleotide signatures
-     euk_origin     -> [not implemented] Identify scaffolds with a coding density suggestive of a Eukaryotic origin
+     taxon_profile  -> Generate a taxonomic profile from the genes within a genome
+     taxon_filter   -> Identify scaffolds with divergent taxonomic classification
+     ssu_erroneous  -> Identify scaffolds with erroneous 16S rRNA genes
 
     Improve completeness:
      reference      -> Identify scaffolds with similarity to specific reference genome(s)
@@ -80,9 +74,12 @@ def print_help():
     Cluster:
      kmeans         -> Partition bin with k-means clustering
      dbscan         -> [not implemented] Partition bin with DBSCAN clustering
+     split          -> Split bin into exactly two partitions using genomic feature thresholds
+     manual         -> Partition bin into clusters based on manual assignment
 
-    Modify genome:
-     modify         -> Modify scaffolds in a genome
+    Modify genome(s):
+     modify_bin     -> Modify scaffolds in a single bin
+     filter_bins    -> Remove scaffolds across a set of bins
 
     Genome validation and exploration:
      unique         -> Ensure scaffolds are assigned to a single genome
@@ -120,7 +117,7 @@ if __name__ == '__main__':
     stats_parser.add_argument('-r', '--cov_all_reads', action='store_true', help="use all reads to estimate coverage instead of just proper pairs")
     stats_parser.add_argument('-a', '--cov_min_align', help='minimum alignment length as percentage of read length', type=float, default=0.98)
     stats_parser.add_argument('-e', '--cov_max_edit_dist', help='maximum edit distance as percentage of read length', type=float, default=0.02)
-    stats_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
+    stats_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=1)
     stats_parser.add_argument('--silent', help="suppress output of logger", action='store_true')
     
     # Calculate genome statistics
@@ -130,26 +127,55 @@ if __name__ == '__main__':
 
     genome_stats_parser.add_argument('scaffold_stats_file', help="file with statistics for each scaffold")
     genome_stats_parser.add_argument('output_file', help="output file with genome statistics")
-    genome_stats_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
+    genome_stats_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=1)
     genome_stats_parser.add_argument('--silent', help="suppress output of logger", action='store_true')
     
     # taxonomically classify genes within genome
-    gene_profile_parser = subparsers.add_parser('gene_profile',
+    taxon_profile_parser = subparsers.add_parser('taxon_profile',
                                         formatter_class=CustomHelpFormatter,
                                         description='Generate taxonomic profile of genes across scaffolds within a genome.')
-    gene_profile_parser.add_argument('genome_prot_dir', help="directory containing amino acid genes for each genome")
-    gene_profile_parser.add_argument('scaffold_stats_file', help="file with statistics for each scaffold")
-    gene_profile_parser.add_argument('db_file', help="DIAMOND database of reference genomes")
-    gene_profile_parser.add_argument('taxonomy_file', help="taxonomic assignment of each reference genomes")
-    gene_profile_parser.add_argument('output_dir', help="output directory")
-    gene_profile_parser.add_argument('-p', '--per_to_classify', type=float, default=20.0, help='minimum percentage of genes to assign a scaffold to a taxonomic group')
-    gene_profile_parser.add_argument('-e', '--evalue', type=float, default=1e-3, help="e-value of valid hits")
-    gene_profile_parser.add_argument('-i', '--per_identity', type=float, default=30.0, help="percent identity of valid hits")
-    gene_profile_parser.add_argument('-a', '--per_aln_len', type=float, default=50.0, help="minimum percent coverage of query sequence for reporting an alignment")
-    gene_profile_parser.add_argument('-x', '--protein_ext', default='faa', help="extension of amino acid gene files (other files in directory are ignored)")
-    gene_profile_parser.add_argument('--tmpdir', action=ChangeTempAction, default=tempfile.gettempdir(), help="specify alternative directory for temporary files")
-    gene_profile_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
-    gene_profile_parser.add_argument('--silent', help="suppress output of logger", action='store_true')
+    taxon_profile_parser.add_argument('genome_prot_dir', help="directory containing amino acid genes for each genome")
+    taxon_profile_parser.add_argument('scaffold_stats_file', help="file with statistics for each scaffold")
+    taxon_profile_parser.add_argument('db_file', help="DIAMOND database of reference genomes")
+    taxon_profile_parser.add_argument('taxonomy_file', help="taxonomic assignment of each reference genomes")
+    taxon_profile_parser.add_argument('output_dir', help="output directory")
+    taxon_profile_parser.add_argument('-p', '--per_to_classify', type=float, default=20.0, help='minimum percentage of genes to assign a scaffold to a taxonomic group')
+    taxon_profile_parser.add_argument('-e', '--evalue', type=float, default=1e-3, help="e-value of valid hits")
+    taxon_profile_parser.add_argument('-i', '--per_identity', type=float, default=30.0, help="percent identity of valid hits")
+    taxon_profile_parser.add_argument('-a', '--per_aln_len', type=float, default=50.0, help="minimum percent coverage of query sequence for reporting an alignment")
+    taxon_profile_parser.add_argument('-x', '--protein_ext', default='faa', help="extension of amino acid gene files (other files in directory are ignored)")
+    taxon_profile_parser.add_argument('--tmpdir', action=ChangeTempAction, default=tempfile.gettempdir(), help="specify alternative directory for temporary files")
+    taxon_profile_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=1)
+    taxon_profile_parser.add_argument('--silent', help="suppress output of logger", action='store_true')
+    
+    # Identify outliers based on taxonomic assignments
+    if False:
+        taxon_filter_parser = subparsers.add_parser('taxon_filter',
+                                                formatter_class=CustomHelpFormatter,
+                                                description='Identify scaffolds with divergent taxonomic classification.')
+        taxon_filter_parser.add_argument('taxon_profile_dir', help="directory with results of taxon_profile command")
+        taxon_filter_parser.add_argument('output_file', help="file indicating divergent scaffolds")
+        taxon_filter_parser.add_argument('-g', '--genome_threshold', help='threshold for accepting taxonomic classification of genome', type=float, default=80.0)
+        taxon_filter_parser.add_argument('-p', '--min_classified_per', help='minimum percentage of genes with a classification to filter a scaffold', type=float, default=25.0)
+        taxon_filter_parser.add_argument('-a', '--min_scaffold_agreement', help='minimum percentage of genes congruent with genome classification to retain scaffold', type=float, default=10.0)
+        taxon_filter_parser.add_argument('-d', '--max_scaffold_disagreement', help='maximum percentage of genes supporting an alternative classifcation to retain scaffold', type=float, default=50.0)
+        taxon_filter_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=1)
+        taxon_filter_parser.add_argument('--silent', help="suppress output of logger", action='store_true')
+    else:
+        taxon_filter_parser = subparsers.add_parser('taxon_filter',
+                                            formatter_class=CustomHelpFormatter,
+                                            description='Identify scaffolds with divergent taxonomic classification.')
+        taxon_filter_parser.add_argument('taxon_profile_dir', help="directory with results of taxon_profile command")
+        taxon_filter_parser.add_argument('output_file', help="file indicating divergent scaffolds")
+        taxon_filter_parser.add_argument('--consensus_taxon', help='threshold for accepting a consensus taxon', type=float, default=50.0)
+        taxon_filter_parser.add_argument('--trusted_scaffold', help='threshold for treating a scaffold as trusted', type=float, default=50.0)
+        taxon_filter_parser.add_argument('--common_taxa', help='threshold for treating a taxon as common', type=float, default=5.0)
+        taxon_filter_parser.add_argument('--congruent_scaffold', help='threshold for treating a scaffold as congruent', type=float, default=10.0)
+        taxon_filter_parser.add_argument('--min_classified_per', help='minimum percentage of genes with a classification to filter a scaffold', type=float, default=25.0)
+        taxon_filter_parser.add_argument('--min_classified', help='minimum number of classified genes required to filter a scaffold', type=int, default=5)
+        taxon_filter_parser.add_argument('--consensus_scaffold', help='threshold of consensus taxon for filtering a scaffold', type=float, default=50.0)
+        taxon_filter_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=1)
+        taxon_filter_parser.add_argument('--silent', help="suppress output of logger", action='store_true')
     
     # Identify outlier sequences
     outlier_parser = subparsers.add_parser('outliers',
@@ -157,10 +183,10 @@ if __name__ == '__main__':
                                             description='Identify scaffolds with divergent genomic characteristics.')
     outlier_parser.add_argument('scaffold_stats_file', help="file with statistics for each scaffold")
     outlier_parser.add_argument('output_dir', help="output directory")
-    outlier_parser.add_argument('--gc_perc', help='percentile for identify scaffolds with divergent GC content', type=int, choices=xrange(0, 101), default=98, metavar='int')
-    outlier_parser.add_argument('--td_perc', help='percentile for identify scaffolds with divergent tetranucleotide signatures', type=int, choices=xrange(0, 101), default=98, metavar='int')
+    outlier_parser.add_argument('--gc_perc', help='percentile for identify scaffolds with divergent GC content', type=int, choices=xrange(-1, 101), default=98, metavar='int')
+    outlier_parser.add_argument('--td_perc', help='percentile for identify scaffolds with divergent tetranucleotide signatures', type=int, choices=xrange(-1, 101), default=98, metavar='int')
     outlier_parser.add_argument('--cov_corr', help='correlation for identifying scaffolds with divergent coverage profiles', type=float, default=0.8)
-    outlier_parser.add_argument('--cov_perc', help='mean absolute percent error for identifying scaffolds with divergent coverage profiles', type=int, choices=xrange(0, 1001), default=50, metavar='int')
+    outlier_parser.add_argument('--cov_perc', help='mean absolute percent error for identifying scaffolds with divergent coverage profiles', type=int, choices=xrange(-1, 1001), default=50, metavar='int')
     outlier_parser.add_argument('-r', '--report_type', help="report sequences that are outliers in 'all' or 'any' reference distribution", choices=['any', 'all'], default='any')
     outlier_parser.add_argument('--no_plots', action="store_true", default=False, help='do not generate any plots')
     outlier_parser.add_argument('--individual_plots', action="store_true", default=False, help='create individual plots for each statistic')
@@ -173,6 +199,29 @@ if __name__ == '__main__':
     outlier_parser.add_argument('--width', type=float, default=12, help='width of output image')
     outlier_parser.add_argument('--height', type=float, default=6, help='height of output image')
     outlier_parser.add_argument('--silent', help="suppress output of logger", action='store_true')
+    
+    # Identify erroneous 16S
+    ssu_erroneous_parser = subparsers.add_parser('ssu_erroneous',
+                                            formatter_class=CustomHelpFormatter,
+                                            description='Identify scaffolds with erroneous 16S rRNA genes.')
+    ssu_erroneous_parser.add_argument('genome_nt_dir', help="directory containing nucleotide scaffolds for each genome")
+    ssu_erroneous_parser.add_argument('taxon_profile_dir', help="directory with results of taxon_profile command")
+    ssu_erroneous_parser.add_argument('ssu_db', help="BLAST database of 16S rRNA genes")
+    ssu_erroneous_parser.add_argument('ssu_taxonomy_file', help="taxonomy file for genes in the 16S rRNA database")
+    ssu_erroneous_parser.add_argument('output_dir', help="output directory")
+    ssu_erroneous_parser.add_argument('-x', '--genome_ext', default='fna', help="extension of genomes (other files in directory are ignored)")
+    ssu_erroneous_parser.add_argument('--evalue', help='e-value threshold for identifying and classifying 16S rRNA genes', type=float, default=1e-5)
+    ssu_erroneous_parser.add_argument('--concatenate', help='concatenate hits within the specified number of base pairs', type=int, default=200)
+    ssu_erroneous_parser.add_argument('--common_taxon', help='threshold for defining a taxon as common', type=float, default=10.0)
+    ssu_erroneous_parser.add_argument('--ssu_min_len', help='minimum length of SSU 16S gene fragment to consider for classification', type=int, default=600)
+    ssu_erroneous_parser.add_argument('--ssu_domain', help='percent identity threshold for accepting domain classification of SSU', type=float, default=83.68)
+    ssu_erroneous_parser.add_argument('--ssu_phylum', help='percent identity threshold for accepting phylum classification of SSU', type=float, default=86.35)
+    ssu_erroneous_parser.add_argument('--ssu_class', help='percent identity threshold for accepting class classification of SSU', type=float, default=89.2)
+    ssu_erroneous_parser.add_argument('--ssu_order', help='percent identity threshold for accepting order classification of SSU', type=float, default=92.25)
+    ssu_erroneous_parser.add_argument('--ssu_family', help='percent identity threshold for accepting family classification of SSU', type=float, default=96.4)
+    ssu_erroneous_parser.add_argument('--ssu_genus', help='percent identity threshold for accepting genus classification of SSU', type=float, default=98.7)
+    ssu_erroneous_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=1)
+    ssu_erroneous_parser.add_argument('--silent', help="suppress output of logger", action='store_true')
     
     # k-means clustering
     kmeans_parser = subparsers.add_parser('kmeans',
@@ -187,7 +236,7 @@ if __name__ == '__main__':
     kmeans_parser.add_argument('-K', help="K-mer size to use for calculating genomic signature", type=int, default=4)
     kmeans_parser.add_argument('--no_coverage', help="do not use coverage information for clustering", action='store_true')
     kmeans_parser.add_argument('--no_pca', help="do not calculate PCA of genomic signature", action='store_true')
-    kmeans_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
+    kmeans_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=1)
     kmeans_parser.add_argument('--silent', help="suppress output of logger", action='store_true')
     
     # DBSCAN clustering
@@ -196,15 +245,34 @@ if __name__ == '__main__':
                                             description='Partition bin with DBSCAN clustering.')
     dbscan_parser.add_argument('scaffold_stats_file', help="file with statistics for each scaffold")
     dbscan_parser.add_argument('genome_file', help='genome bin to cluster')
-    dbscan_parser.add_argument('num_clusters', help='number of desired clusters', type=int)
     dbscan_parser.add_argument('output_dir', help="output directory")
     dbscan_parser.add_argument('--num_components', help="number of PCA components of genomic signature to consider", type=int, default=3)
     dbscan_parser.add_argument('--min_pts', help="minimum number of neighbour points (scaffolds) required to be a core point", type=int, default=4)
     dbscan_parser.add_argument('--dist_frac', help="fraction of median distance used to define neighbours", type=float, default=0.1)
     dbscan_parser.add_argument('--no_coverage', help="do not use coverage information for clustering", action='store_true')
     dbscan_parser.add_argument('--no_pca', help="do not calculate PCA of genomic signature", action='store_true')
-    dbscan_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
+    dbscan_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=1)
     dbscan_parser.add_argument('--silent', help="suppress output of logger", action='store_true')
+    
+    # split bin
+    split_parser = subparsers.add_parser('split',
+                                            formatter_class=CustomHelpFormatter,
+                                            description='Split bin into exactly two partitions using a single genomic feature.')
+    split_parser.add_argument('scaffold_stats_file', help="file with statistics for each scaffold")
+    split_parser.add_argument('genome_file', help='genome bin to cluster')
+    split_parser.add_argument('criteria1', help="first criteria use for partitioning bin")
+    split_parser.add_argument('criteria2', help="second criteria use for partitioning bin (None to ignore)")
+    split_parser.add_argument('output_dir', help="output directory")
+    split_parser.add_argument('--silent', help="suppress output of logger", action='store_true')
+    
+    # Manual splitting of bin
+    manual_parser = subparsers.add_parser('manual',
+                                            formatter_class=CustomHelpFormatter,
+                                            description='Partition bin into clusters based on manual assignment.')
+    manual_parser.add_argument('cluster_file', help="file indicating cluster assignment of each scaffold")
+    manual_parser.add_argument('genome_file', help='genome bin to cluster')
+    manual_parser.add_argument('output_dir', help="output directory")
+    manual_parser.add_argument('--silent', help="suppress output of logger", action='store_true')
     
     # Identify scaffolds with similarity to a set of reference genomes
     reference_parser = subparsers.add_parser('reference',
@@ -220,7 +288,7 @@ if __name__ == '__main__':
     reference_parser.add_argument('-a', '--per_aln_len', type=float, default=50.0, help="minimum percent coverage of query sequence for valid hits")
     reference_parser.add_argument('-x', '--protein_ext', default='faa', help="extension of amino acid gene files (other files in directory are ignored)")
     reference_parser.add_argument('--tmpdir', action=ChangeTempAction, default=tempfile.gettempdir(), help="specify alternative directory for temporary files")
-    reference_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
+    reference_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=1)
     reference_parser.add_argument('--silent', help="suppress output of logger", action='store_true')
     
     # Identify scaffolds with compatible GC, coverage, and tetranucleotide signatures
@@ -241,18 +309,29 @@ if __name__ == '__main__':
     compatible_parser.add_argument('--silent', help="suppress output of logger", action='store_true')
     
     # Modify a bin
-    modify_parser = subparsers.add_parser('modify',
+    modify_bin_parser = subparsers.add_parser('modify_bin',
                                             formatter_class=CustomHelpFormatter,
-                                            description='Modify scaffolds in a genome.')
-    modify_parser.add_argument('scaffold_file', help="scaffolds binned to generate putative genomes")
-    modify_parser.add_argument('genome_file', help="genome to be modified")
-    modify_parser.add_argument('output_genome', help="modified genome")
-    modify_parser.add_argument('-a', '--add', action='append', help="ID of scaffold to add to genome (may specify multiple times)")
-    modify_parser.add_argument('-r', '--remove', action='append', help="ID of scaffold to remove from bin (may specify multiple times)")
-    modify_parser.add_argument('-o', '--outlier_file', help="remove all scaffolds identified as outliers (see outlier command)")
-    modify_parser.add_argument('-c', '--compatible_file', help="add all scaffolds identified as compatible (see compatible command)")
-    modify_parser.add_argument('-u', '--unique_only', help="only consider scaffolds specified exactly once in the compatible file (see compatible command)")
-    modify_parser.add_argument('--silent', help="suppress output of logger", action='store_true')
+                                            description='Modify scaffolds in a single bin.')
+    modify_bin_parser.add_argument('scaffold_file', help="scaffolds binned to generate putative genomes")
+    modify_bin_parser.add_argument('genome_file', help="genome to be modified")
+    modify_bin_parser.add_argument('output_genome', help="modified genome")
+    modify_bin_parser.add_argument('-a', '--add', action='append', help="ID of scaffold to add to genome (may specify multiple times)")
+    modify_bin_parser.add_argument('-r', '--remove', action='append', help="ID of scaffold to remove from bin (may specify multiple times)")
+    modify_bin_parser.add_argument('-o', '--outlier_file', help="remove all scaffolds identified as outliers (see outlier command)")
+    modify_bin_parser.add_argument('-c', '--compatible_file', help="add all scaffolds identified as compatible (see compatible command)")
+    modify_bin_parser.add_argument('-u', '--unique_only', help="only consider scaffolds specified exactly once in the compatible file (see compatible command)")
+    modify_bin_parser.add_argument('--silent', help="suppress output of logger", action='store_true')
+    
+    # Remove scaffolds across bins
+    filter_bins_parser = subparsers.add_parser('filter_bins',
+                                            formatter_class=CustomHelpFormatter,
+                                            description='Remove scaffolds across a set of bins.')
+    filter_bins_parser.add_argument('genome_nt_dir', help="directory containing nucleotide scaffolds for each genome")
+    filter_bins_parser.add_argument('filter_file', help="file specifying scaffolds to remove")
+    filter_bins_parser.add_argument('output_dir', help="output directory")
+    filter_bins_parser.add_argument('-x', '--genome_ext', default='fna', help="extension of genomes (other files in directory are ignored)")
+    filter_bins_parser.add_argument('--modified_only', action='store_true', help="only copy modified bins to the output folder")
+    filter_bins_parser.add_argument('--silent', help="suppress output of logger", action='store_true')
     
     # Ensure scaffolds are assigned to a single bin
     unique_parser = subparsers.add_parser('unique',
@@ -283,7 +362,7 @@ if __name__ == '__main__':
     call_genes_parser.add_argument('output_dir', help="output directory")
     call_genes_parser.add_argument('-u', '--unbinned_file', help="call genes on unbinned scaffolds", default=None)
     call_genes_parser.add_argument('-x', '--genome_ext', default='fna', help="extension of genomes (other files in directory are ignored)")
-    call_genes_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=16)
+    call_genes_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=1)
     call_genes_parser.add_argument('--silent', help="suppress output of logger", action='store_true')
 
     # identify unbinned scaffolds

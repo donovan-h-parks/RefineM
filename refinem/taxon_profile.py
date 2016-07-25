@@ -39,17 +39,18 @@ from biolib.plots.krona import Krona
 
 from numpy import mean
 
+from refinem import version
 from refinem.common import concatenate_gene_files
 from refinem.scaffold_stats import ScaffoldStats
 
 
 """
 To Do:
- 2. Should we get some form of gene annotation into the mix?
+    Get some form of gene annotation into the mix?
 """
 
 
-class GeneProfile(object):
+class TaxonProfile(object):
     """Create taxonomic profiles of genes across scaffolds within a genome.
 
     Genes are classified through homolog search against a
@@ -107,7 +108,7 @@ class GeneProfile(object):
 
         processed_gene_id = set()
         for hit in blast_parser.read_hit(table):
-            gene_id, genome_id = hit.query_id.split('~')
+            genome_id, gene_id = hit.query_id.split('~')
             if gene_id in processed_gene_id:
                 # Only consider the first hit as diamond/blast
                 # tables are sorted by bitscore. In practice, few
@@ -117,7 +118,7 @@ class GeneProfile(object):
             processed_gene_id.add(gene_id)
             scaffold_id = gene_id[0:gene_id.rfind('_')]
 
-            subject_gene_id, subject_genome_id = hit.subject_id.split('~')
+            subject_genome_id, subject_gene_id = hit.subject_id.split('~')
             self.profiles[genome_id].add_hit(gene_id,
                                              scaffold_id,
                                              subject_gene_id,
@@ -154,7 +155,259 @@ class GeneProfile(object):
             self.profiles[genome_id].write_genome_summary(fout)
 
         fout.close()
+        
+    def common_taxa(self, common_threshold, min_classified_per):
+        """Get common taxa at each rank.
+        
+        Any rank in the dictionary that does not exist had 
+        an insufficient number of classified genes to establish
+        a set of common taxa.
+        
+        Parameters
+        ----------
+        common_threshold : float
+            Percentage of classified genes for a taxon to be defined as common.
+        min_classified_per : float
+            Required percentage of classified genes to determine common taxa.
 
+        Returns
+        -------
+        d[genome_id][rank] -> set of common taxa
+            Support for taxon at each rank.
+        """
+        
+        common_taxa = {}
+        
+        bin_report_dir = os.path.join(self.output_dir, 'bin_reports')
+        for f in os.listdir(bin_report_dir):
+            if not f.endswith('.gene.tsv'):
+                continue
+            
+            genome_id = f[0:f.rfind('_genes.gene.tsv')]
+            common_taxa[genome_id] = {}
+        
+            profile = self.read_scaffold_profile(genome_id, classified_genes=True)
+            scaffold_stats = self.read_scaffold_stats(genome_id)
+            
+            # identify common taxa across scaffolds
+            for rank in xrange(0, len(Taxonomy.rank_prefixes)):
+                total_genes = 0
+                genome_gene_count = defaultdict(int)
+                for scaffold_id in profile:
+                    _, _, _, num_genes, _ = scaffold_stats[scaffold_id]
+                    total_genes += num_genes
+                    
+                    for taxon, stats in profile[scaffold_id][rank].iteritems():
+                        _percent, gene_count, classified_genes = stats
+                        genome_gene_count[taxon] += gene_count
+                        
+                total_classified_genes = sum(genome_gene_count.values())
+                if total_genes == 0 or (total_classified_genes * 100.0 / total_genes < min_classified_per):
+                    break
+                    
+                common_taxa[genome_id][rank] = set()
+                for taxon, gene_count in genome_gene_count.iteritems():
+                    if gene_count * 100.0 / total_classified_genes >= common_threshold:
+                        common_taxa[genome_id][rank].add(taxon)
+            
+        return common_taxa
+        
+    def read_genome_profile(self):
+        """Read taxonomic identification of each genome.
+
+        Returns
+        -------
+        d[genome_id][rank] -> (taxon, percentage)
+            Support for taxon at each rank.
+        """
+        
+        profiles = {}
+        
+        genome_summary_file = os.path.join(self.output_dir, 'genome_summary.tsv')
+        with open(genome_summary_file) as f:
+            f.readline()
+            
+            for line in f:
+                line_split = line.split('\t')
+                genome_id = line_split[0]
+                if genome_id.endswith('_genes'):
+                    genome_id = genome_id[0:genome_id.rfind('_genes')]
+                
+                profiles[genome_id] = {}
+                for r, i in enumerate(xrange(4, len(line_split), 7)):
+                    taxon = line_split[i]
+                    gene_support = float(line_split[i+2])
+                    
+                    if taxon == 'unclassified':
+                        profiles[genome_id][r] = (Taxonomy.rank_prefixes[r], 0)
+                    else:
+                        profiles[genome_id][r] = (taxon, float(gene_support))
+
+        return profiles
+        
+    def read_genome_taxonomy(self):
+        """Read taxonomic identification of each genome.
+        
+        Taxonomy string has the form:
+            d__<taxa> (<% genes>); p__<taxa> (<% genes>); ...; s__<taxa> (<% genes>)
+
+        Returns
+        -------
+        d[genome_id] -> taxonomy info
+            Taxonomic classification with percentage of supporting genes.
+        """
+        
+        profiles = self.read_genome_profile()
+        
+        classification = {}
+        for genome_id in profiles:
+            taxa_str = []
+            for r in xrange(0, len(Taxonomy.rank_prefixes)):
+                taxa_str.append('%s (%.2f)' % profiles[genome_id].get(r, (Taxonomy.rank_prefixes[r], 0)))
+                
+            classification[genome_id] = ';'.join(taxa_str)
+
+        return classification
+        
+    def read_scaffold_taxonomy(self):
+        """Read taxonomic identification of each scaffold.
+        
+        Taxonomy string has the form:
+            d__<taxa> (<% genes>); p__<taxa> (<% genes>); ...; s__<taxa> (<% genes>)
+
+        Returns
+        -------
+        d[genome_id][scaffold_id] -> taxonomy info
+            Taxonomic classification with percentage of supporting genes.
+        """
+        
+        classification = defaultdict(dict)
+        
+        bin_report_dir = os.path.join(self.output_dir, 'bin_reports')
+        for f in os.listdir(bin_report_dir):
+            if not f.endswith('.scaffolds.tsv'):
+                continue
+                
+            scaffold_summary_file = os.path.join(bin_report_dir, f)
+            with open(scaffold_summary_file) as f:
+                f.readline()
+                
+                for line in f:
+                    line_split = line.split('\t')
+                    scaffold_id = line_split[0]
+                    genome_id = line_split[1]
+                    if genome_id.endswith('_genes'):
+                        genome_id = genome_id[0:genome_id.rfind('_genes')]
+                    
+                    taxa = []
+                    for i in xrange(7, len(line_split), 5):
+                        taxon = line_split[i]
+                        gene_support = line_split[i+1]
+                        
+                        taxa.append('%s (%s)' % (taxon, gene_support))
+                        
+                    classification[genome_id][scaffold_id] = ';'.join(taxa)
+
+        return classification
+
+    def read_scaffold_profile(self, genome_id, classified_genes):
+        """Read complete taxonomic profile.
+        
+        Parameters
+        ----------
+        genome_id : str
+            Identifier of genome of interest.
+        classified_genes : boolean
+            Base profile percentages on just classified genes (True), or all genes (False).
+            
+        Returns
+        -------
+        d[scaffold_id][rank][taxon] -> (percentage, genes with classification, genes considered)
+            Classification of scaffold across all ranks and taxa.
+        """
+        
+        # read number of genes in each scaffold
+        gene_count = {}
+        with open(os.path.join(self.output_dir, 'bin_reports', genome_id + '_genes.scaffolds.tsv')) as fin:
+            fin.readline()
+            
+            for line in fin:
+                line_split = line.split('\t')
+                
+                scaffold_id = line_split[0]
+                genes = int(line_split[5])
+                
+                gene_count[scaffold_id] = genes
+
+        # read taxonomic assignment of each gene
+        gene_taxonomy = defaultdict(lambda : defaultdict(lambda : defaultdict(int)))
+        with open(os.path.join(self.output_dir, 'bin_reports', genome_id + '_genes.gene.tsv')) as fin:
+            fin.readline()
+            
+            for line in fin:
+                line_split = line.split('\t')
+                
+                gene_id = line_split[0]
+                scaffold_id = gene_id[0:gene_id.rfind('_')]
+                taxonomy = line_split[4].split(';')
+                
+                for r, t in enumerate(taxonomy):
+                    if t == Taxonomy.rank_prefixes[r]:
+                        continue
+                        
+                    gene_taxonomy[scaffold_id][r][t] += 1
+                    
+        # calculate percentages
+        profile = defaultdict(lambda : defaultdict(lambda : defaultdict(float)))
+        for scaffold_id in gene_taxonomy:
+            for rank in xrange(0, len(Taxonomy.rank_prefixes)):
+                total = gene_count[scaffold_id]
+                if rank in gene_taxonomy[scaffold_id]:
+                    if classified_genes:
+                        total = sum(gene_taxonomy[scaffold_id][rank].values())
+                    
+                    for taxon, count in gene_taxonomy[scaffold_id][rank].iteritems():
+                        profile[scaffold_id][rank][taxon] = (float(count) * 100.0 / total, count, total)
+                else:
+                    # no classification at this rank
+                    if classified_genes:
+                        total = 0
+                    profile[scaffold_id][rank][Taxonomy.rank_prefixes[rank]] = (0.0, 0, total)
+                    
+        return profile
+    
+    def read_scaffold_stats(self, genome_id):
+        """Read common statistics for scaffold.
+        
+        Parameters
+        ----------
+        genome_id : str
+            Identifier of genome of interest.
+            
+        Returns
+        -------
+        d[scaffold_id] -> (length, GC, mean coverage, # genes, coding bases)
+            Common statistics for each scaffold.
+        """
+        
+        stats = {}
+        with open(os.path.join(self.output_dir, 'bin_reports', genome_id + '_genes.scaffolds.tsv')) as fin:
+            fin.readline()
+            
+            for line in fin:
+                line_split = line.split('\t')
+                
+                scaffold_id = line_split[0]
+                length = int(line_split[2])
+                gc = float(line_split[3])
+                mean_cov = float(line_split[4])
+                genes = int(line_split[5])
+                coding_bases = int(line_split[6])
+                
+                stats[scaffold_id] = (length, gc, mean_cov, genes, coding_bases)
+
+        return stats
+    
     def run(self, gene_files, 
                     stat_file, 
                     db_file, 
@@ -162,7 +415,8 @@ class GeneProfile(object):
                     percent_to_classify, 
                     evalue, 
                     per_identity, 
-                    per_aln_len):
+                    per_aln_len,
+                    tmpdir):
         """Create taxonomic profiles for a set of genomes.
 
         Parameters
@@ -183,6 +437,8 @@ class GeneProfile(object):
             Percent identity threshold used to identify homologs [0, 100].
         per_aln_len : float
             Percent coverage of query sequence used to identify homologs [0, 100].
+        tmpdir : str
+            Directory to use for temporary files.
         """
 
         # read statistics file
@@ -206,14 +462,13 @@ class GeneProfile(object):
         if not t.validate(taxonomy, check_prefixes=True, check_ranks=True, check_hierarchy=False, check_species=False, report_errors=True):
             self.logger.error('Invalid taxonomy file.')
             sys.exit()
-
+            
         # record length and number of genes in each scaffold
         for aa_file in gene_files:
             genome_id = remove_extension(aa_file)
             self.profiles[genome_id] = Profile(genome_id, percent_to_classify, taxonomy)
 
             for seq_id, seq in seq_io.read_seq(aa_file):
-                seq_id = seq_id[0:seq_id.rfind('~')]
                 scaffold_id = seq_id[0:seq_id.rfind('_')]
                 self.profiles[genome_id].genes_in_scaffold[scaffold_id] += 1
                 self.profiles[genome_id].coding_bases[scaffold_id] += len(seq) * 3  # length in nucleotide space
@@ -222,12 +477,9 @@ class GeneProfile(object):
         self.logger.info('Running diamond blastp with %d processes (be patient!)' % self.cpus)
 
         diamond = Diamond(self.cpus)
-        diamond_daa_out = os.path.join(diamond_output_dir, 'diamond_hits')
-        diamond.blastp(gene_file, db_file, evalue, per_identity, per_aln_len, 1, diamond_daa_out)
-   
         diamond_table_out = os.path.join(diamond_output_dir, 'diamond_hits.tsv')
-        diamond.view(diamond_daa_out + '.daa', diamond_table_out)
-
+        diamond.blastp(gene_file, db_file, evalue, per_identity, per_aln_len, 1, diamond_table_out, output_fmt='tab', tmp_dir=tmpdir)
+   
         # create taxonomic profile for each genome
         self.logger.info('Creating taxonomic profile for each genome.')
         self.taxonomic_profiles(diamond_table_out, taxonomy)
@@ -254,6 +506,7 @@ class GeneProfile(object):
         self.write_genome_summary(genome_summary_out)
 
         # create Krona plot based on classification of scaffolds
+        self.logger.info('Creating Krona plot for each genome.')
         krona_profiles = defaultdict(lambda: defaultdict(int))
         for genome_id, profile in self.profiles.iteritems():
             seq_assignments = profile.classify_seqs()
@@ -286,7 +539,227 @@ class GeneProfile(object):
 
         krona_output_file = os.path.join(self.output_dir, 'gene_profiles.genes.html')
         krona.create(krona_profiles, krona_output_file)
+        
+    def filter(self, 
+                consensus_taxon_threshold, 
+                trusted_scaffold_threshold, 
+                common_taxa_threshold, 
+                congruent_scaffold_threshold,
+                min_classified_per_threshold,
+                min_classified_threshold,
+                consensus_scaffold_threshold,
+                output_file):
+        """Filter scaffolds with divergent taxonomic classification.
+        
+        Parameters
+        ----------
+        consensus_taxon_threshold : float
+            Threshold for accepting a consensus taxon.
+        trusted_scaffold_threshold : float
+            Threshold for treating a scaffold as trusted.
+        common_taxa_threshold : float
+            Threshold for treating a taxon as common.
+        congruent_scaffold_threshold : float
+            Threshold for treating a scaffold as congruent.
+        min_classified_per_threshold : float
+            Minimum percentage of genes with a classification to filter a scaffold.
+        min_classified_threshold : int
+            Minimum number of classified genes required to filter a scaffold.
+        consensus_scaffold_threshold : float
+            Threshold of consensus taxon for filtering a scaffold.
+        output_file : str
+            File to write filtered scaffolds.
+        """
+        
+        # filter scaffolds with divergent taxonomic classifications
+        self.logger.info('Identifying scaffolds with divergent taxonomic classifications.')
+        fout = open(output_file, 'w')
+        fout.write('# Taxon filtering with RefineM v%s\n' % version())
+        fout.write('# consensus_taxon_threshold: %.2f\n' % consensus_taxon_threshold)
+        fout.write('# trusted_scaffold_threshold: %.2f\n' % trusted_scaffold_threshold)
+        fout.write('# common_taxa_threshold: %.2f\n' % common_taxa_threshold)
+        fout.write('# congruent_scaffold_threshold: %.2f\n' % congruent_scaffold_threshold)
+        fout.write('# min_classified_per_threshold: %.2f\n' % min_classified_per_threshold)
+        fout.write('# min_classified_threshold: %.2f\n' % min_classified_threshold)
+        fout.write('Scaffold id\tGenome id\t# classified scaffolds')
+        fout.write('\tConsensus taxon\tGenome support\tScaffold support')
+        fout.write('\t# trusted scaffolds\tCommon taxa\tCommon taxa support')
+        fout.write('\tScaffold taxon\tScaffold support')
+        fout.write('\tLength (bp)\t# genes\t# classified genes\tGC\tMean coverage\n')
+        
+        bin_report_dir = os.path.join(self.output_dir, 'bin_reports')
+        for f in os.listdir(bin_report_dir):
+            if not f.endswith('.gene.tsv'):
+                continue
+            
+            genome_id = f[0:f.rfind('_genes.gene.tsv')]
+            profile = self.read_scaffold_profile(genome_id, classified_genes=True)
+            scaffold_stats = self.read_scaffold_stats(genome_id)
+            
+            for rank in xrange(0, len(Taxonomy.rank_prefixes)):
+                # determine consensus taxon for genome
+                genome_consensus = defaultdict(int)
+                genome_classified_genes = 0
+                for scaffold_id in profile:
+                    for taxon, stats in profile[scaffold_id][rank].iteritems():
+                        _, gene_count, classified_genes = stats
+                        
+                        genome_consensus[taxon] += gene_count
+                        
+                    genome_classified_genes += classified_genes
+                    
+                if genome_classified_genes == 0:
+                    # no classifed genes at this rank
+                    break
+                    
+                consensus_taxon, consensus_genes = sorted(genome_consensus.items(), key=operator.itemgetter(1), reverse=True)[0]
+                consensus_support = float(consensus_genes) * 100.0 / genome_classified_genes
+                if consensus_support < consensus_taxon_threshold:
+                    # stop filtering
+                    break
+                    
+                # identify trusted scaffolds based on consensus taxon
+                trusted_scaffolds = set()
+                trusted_gene_profile = defaultdict(float)
+                trusted_classified_genes = 0
+                for scaffold_id in profile:
+                    support, _, _ = profile[scaffold_id][rank].get(consensus_taxon, [0, 0, 0])
+                    if support > trusted_scaffold_threshold:
+                        trusted_scaffolds.add(scaffold_id)
+                        
+                        for taxon, stats in profile[scaffold_id][rank].iteritems():
+                            _, gene_count, classified_genes = stats
+                            trusted_gene_profile[taxon] += gene_count
 
+                        trusted_classified_genes += classified_genes
+
+                # identify common taxa across trusted scaffolds
+                common_taxa = set()
+                for taxon, gene_count in trusted_gene_profile.iteritems():
+                    if gene_count * 100.0 / trusted_classified_genes > common_taxa_threshold:
+                        common_taxa.add(taxon)
+     
+                # filter scaffolds that are incongruent with list of common taxa
+                filtered_scaffolds = []
+                for scaffold_id in profile:
+                    length, gc, mean_cov, num_genes, _coding_bases = scaffold_stats[scaffold_id]
+                    scaffold_consensus_support, _, classified_genes = profile[scaffold_id][rank].get(consensus_taxon, [0, 0, 0])
+                    
+                    if classified_genes < max(min_classified_threshold, num_genes * min_classified_per_threshold/100):
+                        continue
+                
+                    congruent_gene_count = 0
+                    scaffold_taxon = consensus_taxon
+                    scaffold_taxon_support = scaffold_consensus_support
+                    for taxon, stats in profile[scaffold_id][rank].iteritems():
+                        support, gene_count, classified_genes = stats
+                        
+                        if taxon in common_taxa:                            
+                            congruent_gene_count += gene_count
+                            
+                        if support > scaffold_taxon_support:
+                            scaffold_taxon_support = support
+                            scaffold_taxon = taxon
+                            
+                    if classified_genes == 0:
+                        # can not filter a scaffold with no classified genes
+                        # at the current rank
+                        continue
+                            
+                    congruent_per = congruent_gene_count * 100.0 / classified_genes
+                    if congruent_per <= congruent_scaffold_threshold and scaffold_taxon_support > consensus_scaffold_threshold:
+                        common_taxa_str = ','.join(sorted(list(common_taxa)))
+                        
+                        fout.write('%s\t%s\t%d' % (scaffold_id, genome_id, len(profile)))
+                        fout.write('\t%s\t%.2f\t%.2f' % (consensus_taxon, consensus_support, scaffold_consensus_support))
+                        fout.write('\t%d\t%s\t%.2f' % (len(trusted_scaffolds), common_taxa_str, congruent_per))
+                        fout.write('\t%s\t%.2f' % (scaffold_taxon, scaffold_taxon_support))
+                        fout.write('\t%d\t%d\t%d\t%.2f\t%.2f\n' % (length, num_genes, classified_genes, gc, mean_cov))
+                        
+                        filtered_scaffolds.append(scaffold_id)
+                        
+                # remove filtered scaffolds before considering next rank
+                for scaffold_id in filtered_scaffolds:
+                    profile.pop(scaffold_id)
+
+        fout.close()
+
+        
+    def filter_deprecated(self, genome_threshold, min_scaffold_agreement, max_scaffold_disagreement, min_classified_per, output_file):
+        """Filter scaffolds with divergent taxonomic classification.
+        
+        Parameters
+        ----------
+        genome_threshold : float
+            Threshold for accepting taxonomic classification of genome.
+        min_scaffold_agreement : float
+            Minimum percentage of genes congruent with genome classification to retain scaffold.
+        max_scaffold_disagreement : float
+            Maximum percentage of genes supporting an alternative taxon to retain scaffold.
+        min_classified_per : float
+            Minimum percentage of genes with a classification to filter a scaffold.
+        output_file : str
+            File to write filtered scaffolds.
+        """
+        
+        # read taxonomic profiles for genomes: d[genome_id][rank] -> (taxon, support)
+        self.logger.info('Reading genome profiles.')
+        genome_profiles = self.read_genome_profile()
+        
+        # filter scaffolds with divergent taxonomic classifications
+        self.logger.info('Identifying scaffolds with divergent taxonomic classifications.')
+        fout = open(output_file, 'w')
+        fout.write('# Taxon filtering with RefineM v%s\n' % version())
+        fout.write('# min_scaffold_agreement: %.2f\n' % min_scaffold_agreement)
+        fout.write('# max_scaffold_disagreement: %.2f\n' % max_scaffold_disagreement)
+        fout.write('# min_classified_per: %.2f\n' % min_classified_per)
+        fout.write('Scaffold id\tGenome id\tGenome taxon\tGenome support\tScaffold support\tScaffold taxon\tScaffold support\tLength (bp)\t# genes\t# classified genes\tGC\tMean coverage\n')
+        
+        bin_report_dir = os.path.join(self.output_dir, 'bin_reports')
+        for f in os.listdir(bin_report_dir):
+            if not f.endswith('.gene.tsv'):
+                continue
+            
+            genome_id = f[0:f.rfind('_genes.gene.tsv')]
+            profile = self.read_scaffold_profile(genome_id, classified_genes=True)
+            
+            scaffold_stats = self.read_scaffold_stats(genome_id)
+
+            for scaffold_id in profile:
+                length, gc, mean_cov, num_genes, _coding_bases = scaffold_stats[scaffold_id]
+                
+                for rank in profile[scaffold_id]:
+                    genome_taxon, genome_support = genome_profiles[genome_id][rank]
+                    
+                    if genome_support >= genome_threshold:
+                        scaffold_support, _, _ = profile[scaffold_id][rank].get(genome_taxon, [0, 0, 0])
+                        
+                        # determine classifcation of scaffold with the most support
+                        scaffold_taxon_support = scaffold_support
+                        scaffold_taxon = genome_taxon
+                        for taxon, stats in profile[scaffold_id][rank].iteritems():
+                            support, _, classified_genes = stats
+                            if support > scaffold_taxon_support:
+                                scaffold_taxon = taxon
+                                scaffold_taxon_support = support
+
+                        if (float(classified_genes) * 100 / num_genes) < min_classified_per:
+                            # insufficient number of classified genes to filter 
+                            # scaffold based on taxonomic classifcation
+                            break
+   
+                        if (scaffold_support < min_scaffold_agreement 
+                            or (scaffold_taxon_support > max_scaffold_disagreement and scaffold_taxon != genome_taxon)):
+                            fout.write('%s\t%s' % (scaffold_id, genome_id))
+                            fout.write('\t%s\t%.2f\t%.2f' % (genome_taxon, genome_support, scaffold_support))
+                            fout.write('\t%s\t%.2f' % (scaffold_taxon, scaffold_taxon_support))
+                            fout.write('\t%d\t%d\t%d\t%.2f\t%.2f\n' % (length, num_genes, classified_genes, gc, mean_cov))
+                            
+                            break
+                    else:
+                        # stop considering taxa once we reach a rank without sufficient support
+                        break
+        fout.close()
 
 class Profile(object):
     """Profile of hits to reference genomes."""
@@ -402,7 +875,7 @@ class Profile(object):
             for rank in xrange(0, len(Taxonomy.rank_prefixes)):
                 taxa = max(rank_hits[rank], key=lambda x: len(rank_hits[rank][x]))
                 count = len(rank_hits[rank][taxa])
-
+                
                 if (taxa != Taxonomy.rank_prefixes[rank]
                     and (count >= self.percent_to_classify * self.genes_in_scaffold[seq_id])
                     and (rank == 0 or expected_parent[taxa] == parent_taxa)):
@@ -504,6 +977,9 @@ class Profile(object):
 
         fout.write('%s\t%d\t%d\t%d' % (self.genome_id, total_seqs, total_genes, total_coding_bases))
         for r in xrange(0, len(Taxonomy.rank_labels)):
+            if len(profile[r]) == 0:
+                continue
+                
             taxa, _percent = max(profile[r].iteritems(), key=operator.itemgetter(1))
 
             if taxa != self.unclassified:

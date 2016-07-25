@@ -5,5 +5,6 @@ include README.rst
 include MANIFEST.in
 include bin refinem
 include refinem VERSION
+include *.txt
 recursive-include refinem *.py *.txt
-
+recursive-include docs *.txt

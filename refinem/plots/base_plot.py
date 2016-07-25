@@ -24,6 +24,8 @@ from biolib.plots.abstract_plot import AbstractPlot
 
 from refinem.plots.mpld3_plugins import Tooltip
 
+from numpy import (mean as np_mean)
+
 
 class BasePlot(AbstractPlot):
     """Base plotting function used by many plots."""
@@ -98,7 +100,10 @@ class BasePlot(AbstractPlot):
             labels.append('<small>{title}</small>'.format(title=id2))
 
             links.append((stats1, stats2))
-            link_colors.append(c1 + [1.0])  # add alpha channel
+            
+            # set to average color of end points and add alpha channel
+            c = np_mean([c1+ [0.5], c2+ [0.5]], axis=0) 
+            link_colors.append(c)
 
         return x, y, colours, labels, links, link_colors
 
@@ -170,7 +175,7 @@ class BasePlot(AbstractPlot):
         axis.set_ylabel(ylabel)
 
         if links:
-            line_segments = LineCollection(links, colors=link_colors)
+            line_segments = LineCollection(links, colors=link_colors, alpha=0.5)
             axis.add_collection(line_segments)
 
         # prettify scatterplot
@@ -220,18 +225,20 @@ class BasePlot(AbstractPlot):
             pts = {label:(x[labels.index(label)],y[labels.index(label)]) for label in labels}
             links = []
             link_colors = []
-            for id1, c1, id2, _c2 in link_scaffold_ids:
+            for id1, c1, id2, c2 in link_scaffold_ids:
                 pts1 = pts.get(id1, None)
                 pts2 = pts.get(id2, None)
 
                 if pts1 == None or pts2 == None:
                     continue
                     
+                # set to average color of end points and add alpha channel
+                c = np_mean([c1 + [0.5], c2 + [0.5]], axis=0)
                 links.append((pts1, pts2))
-                link_colors.append(c1 + [1.0])
+                link_colors.append(c)
             
             if links:
-                line_segments = LineCollection(links, colors=link_colors)
+                line_segments = LineCollection(links, colors=link_colors, alpha=0.5)
                 axis.add_collection(line_segments)
 
         # prettify scatterplot
