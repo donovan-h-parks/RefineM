@@ -25,5 +25,6 @@ setup(
         "matplotlib>=1.4.0",
         "biolib>=0.0.19",
         "jinja2>=2.7.3"
-        "mpld3>=0.2"],
+        "mpld3>=0.2",
+        "weightedstats"],
 )
