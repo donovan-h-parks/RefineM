@@ -16,6 +16,10 @@ if __name__ == '__main__':
     if dirName and os.getcwd() != dirName:
         os.chdir(dirName)
 
+    f = open('README.rst', 'rt')
+    long_description = f.read()
+    f.close()
+
     setup(
         name='refinem',
         version=version(),
@@ -27,7 +31,7 @@ if __name__ == '__main__':
         url='http://pypi.python.org/pypi/refinem/',
         license='GPL3',
         description='A toolbox for improving population genomes.',
-        long_description=open('README.md').read(),
+        long_description=long_description,
         install_requires=[
             "numpy>=1.9.0",
             "matplotlib>=1.4.0",
