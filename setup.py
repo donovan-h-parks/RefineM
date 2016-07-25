@@ -1,4 +1,4 @@
-from distutils.core import setup
+from setuptools import setup
 
 import os
 
@@ -21,9 +21,9 @@ setup(
     description='A toolbox for improving population genomes.',
     long_description=open('README.md').read(),
     install_requires=[
-        "numpy >= 1.9.0",
-        "matplotlib >= 1.4.0",
-        "biolib >= 0.0.19",
-        "jinja2 >= 2.7.3"
-        "mpld3 >= 0.2"],
+        "numpy>=1.9.0",
+        "matplotlib>=1.4.0",
+        "biolib>=0.0.19",
+        "jinja2>=2.7.3"
+        "mpld3>=0.2"],
 )
