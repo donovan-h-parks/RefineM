@@ -142,7 +142,7 @@ class GenomeStats():
         fout = open(output_file, 'w')
         fout.write('Genome id\tGenome size (bp)')
         fout.write('\tMean GC\tMedian GC')
-        fout.write('\tMean scaffold length (bp)\tMean scaffold length (bp)')
+        fout.write('\tMean scaffold length (bp)\tMedian scaffold length (bp)')
         fout.write('\tMean: ' + '\tMean: '.join(self.coverage_headers))
         fout.write('\tMedian: ' + '\tMedian: '.join(self.coverage_headers))
         fout.write('\t' + '\t'.join(self.signature_headers))

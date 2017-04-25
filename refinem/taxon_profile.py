@@ -459,7 +459,14 @@ class TaxonProfile(object):
 
         t = Taxonomy()
         taxonomy = t.read(taxonomy_file)
-        if not t.validate(taxonomy, check_prefixes=True, check_ranks=True, check_hierarchy=False, check_species=False, report_errors=True):
+        if not t.validate(taxonomy, 
+                            check_prefixes=True, 
+                            check_ranks=True, 
+                            check_hierarchy=False, 
+                            check_species=False,
+                            check_group_names=False,
+                            check_duplicate_names=False, 
+                            report_errors=True):
             self.logger.error('Invalid taxonomy file.')
             sys.exit()
             
@@ -478,8 +485,16 @@ class TaxonProfile(object):
 
         diamond = Diamond(self.cpus)
         diamond_table_out = os.path.join(diamond_output_dir, 'diamond_hits.tsv')
-        diamond.blastp(gene_file, db_file, evalue, per_identity, per_aln_len, 1, diamond_table_out, output_fmt='tab', tmp_dir=tmpdir)
-   
+        diamond.blastp(gene_file, 
+                        db_file, 
+                        evalue, 
+                        per_identity, 
+                        per_aln_len, 
+                        1, 
+                        diamond_table_out, 
+                        output_fmt='standard', 
+                        tmp_dir=tmpdir)
+               
         # create taxonomic profile for each genome
         self.logger.info('Creating taxonomic profile for each genome.')
         self.taxonomic_profiles(diamond_table_out, taxonomy)
@@ -643,8 +658,9 @@ class TaxonProfile(object):
                 filtered_scaffolds = []
                 for scaffold_id in profile:
                     length, gc, mean_cov, num_genes, _coding_bases = scaffold_stats[scaffold_id]
-                    scaffold_consensus_support, _, classified_genes = profile[scaffold_id][rank].get(consensus_taxon, [0, 0, 0])
-                    
+                    scaffold_consensus_support, _, _ = profile[scaffold_id][rank].get(consensus_taxon, [0, 0, 0])
+                    classified_genes = profile[scaffold_id][rank].values()[0][2]
+
                     if classified_genes < max(min_classified_threshold, num_genes * min_classified_per_threshold/100):
                         continue
                 
@@ -683,8 +699,7 @@ class TaxonProfile(object):
                     profile.pop(scaffold_id)
 
         fout.close()
-
-        
+   
     def filter_deprecated(self, genome_threshold, min_scaffold_agreement, max_scaffold_disagreement, min_classified_per, output_file):
         """Filter scaffolds with divergent taxonomic classification.
         

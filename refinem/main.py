@@ -520,13 +520,30 @@ class OptionsParser():
                                                                options.output_genome)
         elif options.outlier_file:
             outliers = Outliers()
-            outliers.remove_outliers(options.genome_file, options.outlier_file, options.output_genome)
+            outliers.remove_outliers(options.genome_file, 
+                                        options.outlier_file, 
+                                        options.output_genome, 
+                                        False)
         elif options.compatible_file:
             outliers = Outliers()
             if options.unique_only:
-                outliers.add_compatible_unique(options.scaffold_file, options.genome_file, options.compatible_file, options.output_genome)
+                outliers.add_compatible_unique(options.scaffold_file, 
+                                                options.genome_file, 
+                                                options.compatible_file,
+                                                options.min_len, 
+                                                options.output_genome)
+            elif options.closest_only:
+                outliers.add_compatible_closest(options.scaffold_file, 
+                                                    options.genome_file, 
+                                                    options.compatible_file, 
+                                                    options.min_len, 
+                                                    options.output_genome)
             else:
-                outliers.add_compatible_closest(options.scaffold_file, options.genome_file, options.compatible_file, options.output_genome)
+                outliers.add_compatible(options.scaffold_file, 
+                                        options.genome_file, 
+                                        options.compatible_file, 
+                                        options.min_len, 
+                                        options.output_genome)
 
         if failed_to_add:
             self.logger.warning('Failed to add the following sequence(s):')

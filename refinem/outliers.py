@@ -107,7 +107,7 @@ class Outliers():
         if bModified or not modified_only:
             seq_io.write_fasta(genome_seqs, out_genome)
 
-    def add_compatible_unique(self, scaffold_file, genome_file, compatible_file, out_genome):
+    def add_compatible_unique(self, scaffold_file, genome_file, compatible_file, min_len, out_genome):
         """Add sequences specified as compatible.
 
         Only sequences specified exactly once in the
@@ -121,6 +121,8 @@ class Outliers():
             Fasta file of binned scaffolds.
         compatible_file : str
             File specifying compatible scaffolds.
+        min_len : int
+            Minimum length to add scaffold.
         out_genome : str
             Name of output genome.
         """
@@ -145,17 +147,85 @@ class Outliers():
         for scaffold_id, bin_id in bin_ids.iteritems():
             if scaffold_ids.count(scaffold_id) == 1 and bin_id == cur_bin_id:
                 compatible_scaffolds.add(scaffold_id)
+                
+        self.logger.info('Identified %d compatible scaffolds.' % len(compatible_scaffolds))
 
         # add compatible sequences to genome
+        added_seqs = 0
         genome_seqs = seq_io.read(genome_file)
         for seq_id, seq in seq_io.read_seq(scaffold_file):
             if seq_id in compatible_scaffolds:
-                genome_seqs[seq_id] = seq
+                if len(seq) >= min_len:
+                    genome_seqs[seq_id] = seq
+                    added_seqs += 1
+                
+        self.logger.info('Added %d scaffolds meeting length criterion.' % added_seqs)
 
         # save modified bin
         seq_io.write_fasta(genome_seqs, out_genome)
+        
+    def add_compatible(self, scaffold_file, genome_file, compatible_file, min_len, out_genome):
+        """Add sequences specified as compatible.
 
-    def add_compatible_closest(self, scaffold_file, genome_file, compatible_file, out_genome):
+        Parameters
+        ----------
+        scaffold_file : str
+            Fasta file containing scaffolds to add.
+        genome_file : str
+            Fasta file of binned scaffolds.
+        compatible_file : str
+            File specifying compatible scaffolds.
+        min_len : int
+            Minimum length to add scaffold.
+        out_genome : str
+            Name of output genome.
+        """
+
+        cur_bin_id = remove_extension(genome_file)
+
+        # determine statistics for each potentially compatible scaffold
+        scaffold_ids = set()
+        with open(compatible_file) as f:
+            headers = [x.strip() for x in f.readline().split('\t')]
+            scaffold_gc_index = headers.index('Scaffold GC')
+            genome_gc_index = headers.index('Median genome GC')
+            td_dist_index = headers.index('Scaffold TD')
+            scaffold_cov_index = headers.index('Scaffold coverage')
+            genome_cov_index = headers.index('Median genome coverage')
+
+            for line in f:
+                line_split = line.split('\t')
+                scaffold_id = line_split[0]
+                bin_id = line_split[1].strip()
+
+                scaffold_gc = float(line_split[scaffold_gc_index])
+                genome_gc = float(line_split[genome_gc_index])
+                gc_dist = abs(scaffold_gc - genome_gc)
+
+                td_dist = float(line_split[td_dist_index])
+
+                scaffold_cov = float(line_split[scaffold_cov_index])
+                genome_cov = float(line_split[genome_cov_index])
+                cov_dist = abs(scaffold_cov - genome_cov)
+
+                if bin_id == cur_bin_id:
+                    scaffold_ids.add(scaffold_id)
+
+        # add compatible sequences to genome
+        added_seqs = 0
+        genome_seqs = seq_io.read(genome_file)
+        for seq_id, seq in seq_io.read_seq(scaffold_file):
+            if seq_id in scaffold_ids:
+                if len(seq) >= min_len:
+                    genome_seqs[seq_id] = seq
+                    added_seqs += 1
+                
+        self.logger.info('Added %d scaffolds meeting length criterion.' % added_seqs)
+
+        # save modified bin
+        seq_io.write_fasta(genome_seqs, out_genome)
+        
+    def add_compatible_closest(self, scaffold_file, genome_file, compatible_file, min_len, out_genome):
         """Add sequences specified as compatible.
 
         A sequences is added to a bin if and only if it is
@@ -170,6 +240,8 @@ class Outliers():
             Fasta file of binned scaffolds.
         compatible_file : str
             File specifying compatible scaffolds.
+        min_len : int
+            Minimum length to add scaffold.
         out_genome : str
             Name of output genome.
         """
@@ -222,12 +294,19 @@ class Outliers():
             # check if scaffold is closest to a single bin
             if (best_gc[1] == best_td[1] == best_cov[1]) and best_gc[1] == cur_bin_id:
                 compatible_scaffolds.add(scaffold_id)
+                
+        self.logger.info('Identified %d compatible scaffolds.' % len(compatible_scaffolds))
 
         # add compatible sequences to genome
+        added_seqs = 0
         genome_seqs = seq_io.read(genome_file)
         for seq_id, seq in seq_io.read_seq(scaffold_file):
             if seq_id in compatible_scaffolds:
-                genome_seqs[seq_id] = seq
+                if len(seq) >= min_len:
+                    genome_seqs[seq_id] = seq
+                    added_seqs += 1
+                
+        self.logger.info('Added %d scaffolds meeting length criterion.' % added_seqs)
 
         # save modified bin
         seq_io.write_fasta(genome_seqs, out_genome)
@@ -568,7 +647,7 @@ class Outliers():
 
                 line_split = line.strip().split('\t')
                 if len(line_split) == 2:
-                    link_scaffold_ids.append([line_split[0], (1.0, 0.0, 0.0), line_split[1], (1.0, 0.0, 0.0)])
+                    link_scaffold_ids.append([line_split[0], [1.0, 0.0, 0.0], line_split[1], [1.0, 0.0, 0.0]])
                 else:
                     link_scaffold_ids.append([line_split[0],
                                               [float(x) / 255 for x in line_split[1].split(',')],

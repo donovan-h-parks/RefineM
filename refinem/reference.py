@@ -24,6 +24,7 @@ __email__ = 'donovan.parks@gmail.com'
 
 import os
 import logging
+import operator
 from collections import defaultdict
 
 import biolib.seq_io as seq_io
@@ -117,18 +118,12 @@ class Reference(object):
         self.logger.info('Identifying homologs within reference genomes of interest (be patient!).')
         self.diamond_dir = os.path.join(self.output_dir, 'diamond')
         make_sure_path_exists(self.diamond_dir)
-        hits_ref_genomes_daa = os.path.join(self.diamond_dir, 'ref_hits')
-        diamond.blastp(scaffold_gene_file, ref_diamond_db, evalue, per_identity, per_aln_len, 1, hits_ref_genomes_daa)
-
         hits_ref_genomes = os.path.join(self.diamond_dir, 'ref_hits.tsv')
-        diamond.view(hits_ref_genomes_daa + '.daa', hits_ref_genomes)
+        diamond.blastp(scaffold_gene_file, ref_diamond_db, evalue, per_identity, per_aln_len, 1, hits_ref_genomes)
 
         self.logger.info('Identifying homologs within competing reference genomes (be patient!).')
-        hits_comp_ref_genomes_daa = os.path.join(self.diamond_dir, 'competing_ref_hits')
-        diamond.blastp(scaffold_gene_file, db_file, evalue, per_identity, per_aln_len, 1, hits_comp_ref_genomes_daa)
-
         hits_comp_ref_genomes = os.path.join(self.diamond_dir, 'competing_ref_hits.tsv')
-        diamond.view(hits_comp_ref_genomes_daa + '.daa', hits_comp_ref_genomes)
+        diamond.blastp(scaffold_gene_file, db_file, evalue, per_identity, per_aln_len, 1, hits_comp_ref_genomes)
 
         # get list of genes with a top hit to the reference genomes of interest
         hits_to_ref = self._top_hits_to_reference(hits_ref_genomes, hits_comp_ref_genomes)
@@ -149,8 +144,8 @@ class Reference(object):
         # report summary stats for each scaffold
         reference_out = os.path.join(self.output_dir, 'references.tsv')
         fout = open(reference_out, 'w')
-        fout.write('Scaffold id\tSubject scaffold ids\tSubject genome ids')
-        fout.write('\tGenome id\tLength (bp)\tGC\tMean coverage')
+        fout.write('Scaffold ID\tSubject genome IDs\tSubject scaffold IDs')
+        fout.write('\tGenome ID\tLength (bp)\tGC\tMean coverage')
         fout.write('\t# genes\t# hits\t% genes\tAvg. align. length (bp)\tAvg. % identity\tAvg. e-value\tAvg. bitscore\n')
 
         for scaffold_id, hits in hits_to_scaffold.iteritems():
@@ -166,25 +161,32 @@ class Reference(object):
                 evalue.append(hit.evalue)
                 bitscore.append(hit.bitscore)
 
-                subject_id, subject_bin_id = hit.subject_id.split('~')
-                subject_scaffold_id = subject_id[0:subject_id.rfind('_')]
+                subject_bin_id, subject_gene_id  = hit.subject_id.split('~')
+                subject_scaffold_id = subject_gene_id[0:subject_gene_id.rfind('_')]
                 subject_scaffold_ids[subject_scaffold_id] += 1
                 subject_bin_ids[subject_bin_id] += 1
+               
 
-            subject_scaffold_id_str = []
-            for subject_id, num_hits in subject_scaffold_ids.iteritems():
-                subject_scaffold_id_str.append(subject_id + ':' + str(num_hits))
-            subject_scaffold_id_str = ','.join(subject_scaffold_id_str)
-
+            sorted_subject_bin_ids = sorted(subject_bin_ids.items(), 
+                                                key=operator.itemgetter(1),
+                                                reverse=True)
             subject_bin_id_str = []
-            for bin_id, num_hits in subject_bin_ids.iteritems():
+            for bin_id, num_hits in sorted_subject_bin_ids:
                 subject_bin_id_str.append(bin_id + ':' + str(num_hits))
             subject_bin_id_str = ','.join(subject_bin_id_str)
 
+            sorted_subject_scaffold_ids = sorted(subject_scaffold_ids.items(), 
+                                                    key=operator.itemgetter(1),
+                                                    reverse=True)
+            subject_scaffold_id_str = []
+            for subject_id, num_hits in sorted_subject_scaffold_ids:
+                subject_scaffold_id_str.append(subject_id + ':' + str(num_hits))
+            subject_scaffold_id_str = ','.join(subject_scaffold_id_str)
+
             fout.write('%s\t%s\t%s\t%s\t%.2f\t%d\t%d\t%.2f\t%d\t%.2f\t%.2g\t%.2f\n' % (
                                                                         scaffold_id,
-                                                                        subject_scaffold_id_str,
                                                                         subject_bin_id_str,
+                                                                        subject_scaffold_id_str,
                                                                         scaffold_stats.print_stats(scaffold_id),
                                                                         mean(scaffold_stats.coverage(scaffold_id)),
                                                                         num_genes_on_scaffold[scaffold_id],

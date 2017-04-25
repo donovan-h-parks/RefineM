@@ -102,7 +102,7 @@ class BasePlot(AbstractPlot):
             links.append((stats1, stats2))
             
             # set to average color of end points and add alpha channel
-            c = np_mean([c1+ [0.5], c2+ [0.5]], axis=0) 
+            c = np_mean([c1 + [0.5], c2 + [0.5]], axis=0) 
             link_colors.append(c)
 
         return x, y, colours, labels, links, link_colors
