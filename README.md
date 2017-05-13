@@ -1,4 +1,4 @@
-#RefineM
+# RefineM
 
 **[This project is in active development and not currently recommended for public use.]**
 
@@ -17,7 +17,7 @@ RefineM is a set of tools for improving population genomes. It provides methods 
 * identify contigs with divergent GC content, coverage, or tetranucleotide signatures
 * identify contigs with a coding density suggestive of a Eukaryotic origin
 
-##Install
+## Install
 
 The simplest way to install this package is through pip:
 > sudo pip install refinem
@@ -29,10 +29,10 @@ This package requires numpy to be installed and makes use of the follow bioinfor
 * [diamond](http://ab.inf.uni-tuebingen.de/software/diamond/) Buchfink B, Xie C, Huson DH. 2015. Fast and sensitive protein alignment using DIAMOND. *Nature Methods* 12: 59–60 doi:10.1038/nmeth.3176.
 * [krona](http://sourceforge.net/p/krona/home/krona/) Ondov BD, Bergman NH, and Phillippy AM. 2011. Interactive metagenomic visualization in a Web browser. *BMC Bioinformatics* 12: 385.
 
-##Cite
+## Cite
 
 If you find this package useful, please cite this git repository (https://github.com/dparks1134/refinem)
 
-##Copyright
+## Copyright
 
 Copyright © 2015 Donovan Parks. See LICENSE for further details.
