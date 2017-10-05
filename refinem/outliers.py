@@ -385,7 +385,7 @@ class Outliers():
                     corr_r = 1.0
                     if len(gs.median_coverage) > 1:
                         corr_r, _corr_p = pearsonr(gs.median_coverage, stats.coverage)
-                        if  corr_r < cov_corr:
+                        if corr_r < cov_corr:
                             outlying_dists[scaffold_id].append('COV_CORR')
 
                     mean_cp = []

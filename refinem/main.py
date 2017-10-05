@@ -170,6 +170,7 @@ class OptionsParser():
                 coverage.run(options.bam_files, coverage_file, options.cov_all_reads, options.cov_min_align, options.cov_max_edit_dist)
                 self.logger.info('Coverage profiles written to: %s' % coverage_file)
         else:
+            check_file_exists(options.coverage_file)
             coverage_file = options.coverage_file
 
         # get tetranucleotide signatures

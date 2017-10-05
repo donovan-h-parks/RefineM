@@ -35,7 +35,7 @@ if __name__ == '__main__':
         install_requires=[
             "numpy>=1.9.0",
             "matplotlib>=1.4.0",
-            "biolib>=0.0.19",
+            "biolib>=0.0.45",
             "jinja2>=2.7.3",
             "mpld3>=0.2",
             "weightedstats"],

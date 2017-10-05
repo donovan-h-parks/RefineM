@@ -78,7 +78,7 @@ class Tetranucleotide(object):
 
         total_kmers = sum(sig)
         for i in xrange(0, len(sig)):
-            sig[i] = float(sig[i]) / total_kmers
+            sig[i] = float(sig[i]) / max(total_kmers, 1)
 
         return (seq_id, sig)
 

@@ -491,6 +491,7 @@ class TaxonProfile(object):
                         per_identity, 
                         per_aln_len, 
                         1, 
+                        False,
                         diamond_table_out, 
                         output_fmt='standard', 
                         tmp_dir=tmpdir)
