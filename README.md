@@ -29,6 +29,18 @@ This package requires numpy to be installed and makes use of the follow bioinfor
 * [diamond](http://ab.inf.uni-tuebingen.de/software/diamond/) Buchfink B, Xie C, Huson DH. 2015. Fast and sensitive protein alignment using DIAMOND. *Nature Methods* 12: 59–60 doi:10.1038/nmeth.3176.
 * [krona](http://sourceforge.net/p/krona/home/krona/) Ondov BD, Bergman NH, and Phillippy AM. 2011. Interactive metagenomic visualization in a Web browser. *BMC Bioinformatics* 12: 385.
 
+## File formats
+
+RefineM makes use of a database of protein sequences from reference genomes. The protein sequences must be formatted into a DIAMOND database and have header information in the format <genome_id>~<contig_id>_<gene_num>, e.g.:
+```
+>GCF_001687105.1~contig000001_1
+```
+
+Taxonomy information for the reference genomes must be provided in a seperate taxonomy file. This file is a simple tab-separatedvalues file with two columns indicating the genome ID and Greengenes-style taxonomy string, e.g.:
+```
+>GCF_001687105.1    d__Bacteria;p__Proteobacteria;c__Alphaproteobacteria;o__Rhodobacterales;f__Rhodobacteraceae;g__Yangia;s__
+```
+
 ## Cite
 
 If you find this package useful, please cite this git repository (https://github.com/dparks1134/refinem)
