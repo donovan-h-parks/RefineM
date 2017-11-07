@@ -82,7 +82,11 @@ Taxonomy information for the reference genomes must be provided in a seperate ta
 
 ## Cite
 
-If you find this package useful, please cite this git repository (https://github.com/dparks1134/refinem)
+If you find this package useful, please cite:
+
+Parks DH et al. 2017. [Recovery of nearly 8,000 metagenome-assembled genomes substantially expands the tree of life](http://dx.doi.org/10.1038/s41564-017-0012-7). Nat Microbiol 2: 1533-1542.
+
+Please also consider citing the 3rd party applications required by RefineM such as [Prodigal](http://prodigal.ornl.gov/) and [DIAMOND](http://ab.inf.uni-tuebingen.de/software/diamond/).
 
 ## Copyright
 
