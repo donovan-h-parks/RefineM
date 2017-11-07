@@ -62,11 +62,21 @@ where <bin_dir> is the directory containing your bins and the directory <gene_ou
 
 The genes comprising each bin can then be classified against a reference database using:
 ```
->refinem taxon_profile -c 40 <gene_output_dir> <stats_output_dir>/scaffold_stats.tsv <reference_db> <reference_taxonomy> <profile_output_dir>
+>refinem taxon_profile -c 40 <gene_output_dir> <stats_output_dir>/scaffold_stats.tsv <reference_db> <reference_taxonomy> <taxon_profile_output_dir>
 ```
-where <gene_output_dir> is the output of the call_genes command, <stats_output_dir>/scaffold_stats.tsv is the output from the scaffold_stats command as discussed [above](#removing-contamination-based-on-genomic-properties), and the <reference_db> and <reference_taxonomy> are used as reference database for assigning taxonomic classifications to individual genes based on a top hit criteria. The file format for the reference files is discussed [below](#file-formats). I plan to make pre-built reference files avaliable in the future, but they are not yet ready for public use.
+where <gene_output_dir> is the output of the call_genes command, <stats_output_dir>/scaffold_stats.tsv is the output from the scaffold_stats command as discussed [above](#removing-contamination-based-on-genomic-properties), and the <reference_db> and <reference_taxonomy> are used as reference database for assigning taxonomic classifications to individual genes based on a top hit criteria. The file format for the reference files is discussed [below](#file-formats). I plan to make pre-built reference files avaliable in the future, but they are not yet ready for public use. Results will be written to <taxon_profile_output_dir>.
 
+Scaffolds with divergent taxonomic assignments can then be identified with:
+```
+>refinem taxon_filter -c 40 <taxon_profile_output_dir> taxon_filter.tsv
+```
+where <taxon_profile_output_dir> is the output directory of the taxon_profile command and scaffolds determined to be contamination are written to taxon_filter.tsv. If desired, you can modify the criteria used by RefineM to identify potential contamination (see refinem taxon_filter -h).
 
+Contaminating scaffolds can be removed from your bins as follows:
+```
+>refinem filter_bins <bin_dir> taxon_filter.tsv <filtered_output_dir>
+```
+where <bin_dir> is the directory containing your bins to be modified, taxon_filter.tsv indicates the scaffolds to remove from each bin and is produced by the taxon_filter command, and <filtered_output_dir> will contain your bins with the specified scaffolds removed. If your only want the output directory to contain bins that were modified, you can use the --modified_only flag.
 
 ## File formats
 
