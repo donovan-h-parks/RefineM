@@ -28,6 +28,44 @@ This package requires numpy to be installed and makes use of the follow bioinfor
 * [diamond](http://ab.inf.uni-tuebingen.de/software/diamond/) Buchfink B, Xie C, Huson DH. 2015. Fast and sensitive protein alignment using DIAMOND. *Nature Methods* 12: 59–60 doi:10.1038/nmeth.3176.
 * [krona](http://sourceforge.net/p/krona/home/krona/) Ondov BD, Bergman NH, and Phillippy AM. 2011. Interactive metagenomic visualization in a Web browser. *BMC Bioinformatics* 12: 385.
 
+## Quick start: identifying potential contamination
+
+RefineM can identify potential contamination based on the genomic properties (GC, tetranucleotide signatures, coverage) of scaffolds and based on their taxonomic assignment against a reference database.
+
+### Removing contamination based on genomic properties
+
+To identify scaffolds with genomic properties that are divergent from the expect values for a bin (i.e., metagenome-assembled genome or MAG), the tetranucleotide signature and coverage profiles for scaffolds must be calculated:
+```
+>refinem scaffold_stats -c 16 <scaffold_file> <bin_dir> <stats_output_dir> <bam_files>
+```
+where <scaffold_file> is a FASTA file containing the scaffolds/contigs binned to produce your bins, <bin_dir> is the directory containing your bins, <stats_output_dir> is the directory to store results, and <bam_files> is one are more index BAM files specifying the mapping of reads to the scaffolds/contigs. The number of CPUs to use can be specified with the -c flag.
+
+Scaffolds with divergent genomic properties can then be identified using:
+```
+>refinem outliers <stats_output_dir>/scaffold_stats.tsv <outlier_output_dir>
+```
+where the scaffold_stats.tsv file is produced by the scaffold_stat command and the <outlier_output_dir> will contain a number of data files and plots for manually investigating the genomic properties of scaffolds within your bins. The output file outliers.tsv indicates the scaffolds RefineM has identified as being potential contamination. If desired, you can modify the criteria used by RefineM to identify potential contamination (see refinem outliers -h).
+
+Contaminating scaffolds can be removed from your bins as follows:
+```
+>refinem filter_bins <bin_dir> <outlier_output_dir>/outliers.tsv <filtered_output_dir>
+```
+where <bin_dir> is the directory containing your bins to be modified, outliers.tsv indicates the scaffolds to remove from each bin and is produced by the outliers command, and <filtered_output_dir> will contain your bins with the specified scaffolds removed. If your only want the output directory to contain bins that were modified, you can use the --modified_only flag.
+
+### Removing contamination based on taxonomic assignments
+
+To identify scaffolds with taxonomic assignments that are divergent from the taxonomic affliations of a bin, the genes in each scaffold/contig are classified against a reference database using DIAMOND. You can call genes on all your genomes using:
+```
+>refinem call_genes -c 40 bins <bin_dir> <gene_output_dir>
+```
+where <bin_dir> is the directory containing your bins and the directory <gene_output_dir> will contain called genes for your bins. 
+
+The genes comprising each bin can then be classified against a reference database using:
+```
+>refinem taxon_profile -c 40 <gene_output_dir> <stats_output_dir>/scaffold_stats.tsv <reference_db> <reference_taxonomy> <profile_output_dir>
+```
+where <gene_output_dir> is the output of the call_genes command, <stats_output_dir>/scaffold_stats.tsv is the output from the scaffold_stats command as discussed [above](### Removing contamination based on genomic properties), and the <reference_db> and <reference_taxonomy> are used as reference database for assigning taxonomic classifications to individual genes based on a top hit criteria. The file format for the reference files is discussed [below](## File formats). I plan to make pre-built reference files avaliable in the future, but they are not yet ready for public use.
+
 ## File formats
 
 RefineM makes use of a database of protein sequences from reference genomes. The protein sequences must be formatted into a DIAMOND database and have header information in the format <genome_id>~<contig_id>_<gene_num>, e.g.:
