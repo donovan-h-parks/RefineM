@@ -64,7 +64,7 @@ The genes comprising each bin can then be classified against a reference databas
 ```
 >refinem taxon_profile -c 40 <gene_output_dir> <stats_output_dir>/scaffold_stats.tsv <reference_db> <reference_taxonomy> <profile_output_dir>
 ```
-where <gene_output_dir> is the output of the call_genes command, <stats_output_dir>/scaffold_stats.tsv is the output from the scaffold_stats command as discussed [above](###removing-contamination-based-on-genomic-properties), and the <reference_db> and <reference_taxonomy> are used as reference database for assigning taxonomic classifications to individual genes based on a top hit criteria. The file format for the reference files is discussed [below](##file-formats). I plan to make pre-built reference files avaliable in the future, but they are not yet ready for public use.
+where <gene_output_dir> is the output of the call_genes command, <stats_output_dir>/scaffold_stats.tsv is the output from the scaffold_stats command as discussed [above](#removing-contamination-based-on-genomic-properties), and the <reference_db> and <reference_taxonomy> are used as reference database for assigning taxonomic classifications to individual genes based on a top hit criteria. The file format for the reference files is discussed [below](#file-formats). I plan to make pre-built reference files avaliable in the future, but they are not yet ready for public use.
 
 
 
