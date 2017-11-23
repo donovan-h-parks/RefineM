@@ -85,7 +85,7 @@ RefineM makes use of a database of protein sequences from reference genomes. The
 >GCF_001687105.1~contig000001_1
 ```
 
-Taxonomy information for the reference genomes must be provided in a seperate taxonomy file. This file is a simple tab-separatedvalues file with two columns indicating the genome ID and Greengenes-style taxonomy string, e.g.:
+Taxonomy information for the reference genomes must be provided in a seperate taxonomy file. This file is a simple tab-separated values file with two columns indicating the genome ID and Greengenes-style taxonomy string, e.g.:
 ```
 >GCF_001687105.1    d__Bacteria;p__Proteobacteria;c__Alphaproteobacteria;o__Rhodobacterales;f__Rhodobacteraceae;g__Yangia;s__
 ```
