@@ -64,7 +64,7 @@ The genes comprising each bin can then be classified against a reference databas
 ```
 >refinem taxon_profile -c 40 <gene_output_dir> <stats_output_dir>/scaffold_stats.tsv <reference_db> <reference_taxonomy> <taxon_profile_output_dir>
 ```
-where <gene_output_dir> is the output of the call_genes command, <stats_output_dir>/scaffold_stats.tsv is the output from the scaffold_stats command as discussed [above](#removing-contamination-based-on-genomic-properties), and the <reference_db> and <reference_taxonomy> are used as reference database for assigning taxonomic classifications to individual genes based on a top hit criteria. The file format for the reference files is discussed [below](#file-formats). I plan to make pre-built reference files avaliable in the future, but they are not yet ready for public use. Results will be written to <taxon_profile_output_dir>.
+where <gene_output_dir> is the output of the call_genes command, <stats_output_dir>/scaffold_stats.tsv is the output from the scaffold_stats command as discussed [above](#removing-contamination-based-on-genomic-properties), and the <reference_db> and <reference_taxonomy> are used as reference database for assigning taxonomic classifications to individual genes based on a top hit criteria. Reference files and their format are discussed [below](#reference-database-and-taxonomy-files). 
 
 Scaffolds with divergent taxonomic assignments can then be identified with:
 ```
@@ -78,9 +78,11 @@ Contaminating scaffolds can be removed from your bins as follows:
 ```
 where <bin_dir> is the directory containing your bins to be modified, taxon_filter.tsv indicates the scaffolds to remove from each bin and is produced by the taxon_filter command, and <filtered_output_dir> will contain your bins with the specified scaffolds removed. If your only want the output directory to contain bins that were modified, you can use the --modified_only flag.
 
-## File formats
+## Reference database and taxonomy files
 
-RefineM makes use of a database of protein sequences from reference genomes. The protein sequences must be formatted into a DIAMOND database and have header information in the format <genome_id>~<contig_id>_<gene_num>, e.g.:
+A reference protein database and corresponding taxonomy file can be obtained from https://data.ace.uq.edu.au/public/misc_downloads/refinem/. This database consists of proteins from the dereplicated set of genomes used to define the Genome Taxonomy Database r(GTDB: http://gtdb.ecogenomic.org/).
+
+If you wish to make you own reference database, the protein sequences must be formatted into a DIAMOND database and have header information in the format <genome_id>~<contig_id>_<gene_num>, e.g.:
 ```
 >GCF_001687105.1~contig000001_1
 ```
