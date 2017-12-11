@@ -80,7 +80,7 @@ where <bin_dir> is the directory containing your bins to be modified, taxon_filt
 
 ## Reference database and taxonomy files
 
-A reference protein database and corresponding taxonomy file can be obtained from https://data.ace.uq.edu.au/public/misc_downloads/refinem/. This database consists of proteins from the dereplicated set of genomes used to define the Genome Taxonomy Database r(GTDB: http://gtdb.ecogenomic.org/).
+A reference protein database and corresponding taxonomy file can be obtained from https://data.ace.uq.edu.au/public/misc_downloads/refinem/. This database consists of proteins from the dereplicated set of genomes used to define the Genome Taxonomy Database (GTDB: http://gtdb.ecogenomic.org/).
 
 If you wish to make you own reference database, the protein sequences must be formatted into a DIAMOND database and have header information in the format <genome_id>~<contig_id>_<gene_num>, e.g.:
 ```
