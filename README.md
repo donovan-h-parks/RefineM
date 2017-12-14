@@ -23,10 +23,10 @@ The simplest way to install this package is through pip:
 
 This package requires numpy to be installed and makes use of the follow bioinformatic packages:
 
-* [prodigal](http://prodigal.ornl.gov/): Hyatt D, Locascio PF, Hauser LJ, Uberbacher EC. 2012. Gene and translation initiation site prediction in metagenomic sequences. *Bioinformatics* 28: 2223-2230.
-* [blast+](http://blast.ncbi.nlm.nih.gov/Blast.cgi?PAGE_TYPE=BlastDocs&DOC_TYPE=Download): Camacho C, Coulouris G, Avagyan V, Ma N, Papadopoulos J, Bealer K, Madden TL. 2009. BLAST+: architecture and applications. *BMC Bioinformatics* 10:421: doi: 10.1186/1471-2105-10-421.
-* [diamond](http://ab.inf.uni-tuebingen.de/software/diamond/) Buchfink B, Xie C, Huson DH. 2015. Fast and sensitive protein alignment using DIAMOND. *Nature Methods* 12: 59–60 doi:10.1038/nmeth.3176.
-* [krona](http://sourceforge.net/p/krona/home/krona/) Ondov BD, Bergman NH, and Phillippy AM. 2011. Interactive metagenomic visualization in a Web browser. *BMC Bioinformatics* 12: 385.
+* [prodigal](http://prodigal.ornl.gov/) >=2.6.3: Hyatt D, Locascio PF, Hauser LJ, Uberbacher EC. 2012. Gene and translation initiation site prediction in metagenomic sequences. *Bioinformatics* 28: 2223-2230.
+* [blast+](http://blast.ncbi.nlm.nih.gov/Blast.cgi?PAGE_TYPE=BlastDocs&DOC_TYPE=Download) >=2.6.0: Camacho C, Coulouris G, Avagyan V, Ma N, Papadopoulos J, Bealer K, Madden TL. 2009. BLAST+: architecture and applications. *BMC Bioinformatics* 10:421: doi: 10.1186/1471-2105-10-421.
+* [diamond](http://ab.inf.uni-tuebingen.de/software/diamond/) >=0.9.9: Buchfink B, Xie C, Huson DH. 2015. Fast and sensitive protein alignment using DIAMOND. *Nature Methods* 12: 59–60 doi:10.1038/nmeth.3176.
+* [krona](http://sourceforge.net/p/krona/home/krona/) >=2.7: Ondov BD, Bergman NH, and Phillippy AM. 2011. Interactive metagenomic visualization in a Web browser. *BMC Bioinformatics* 12: 385.
 
 ## Quick start: identifying potential contamination
 
