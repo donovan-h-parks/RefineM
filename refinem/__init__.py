@@ -21,4 +21,4 @@ def version():
     """Read program version from file."""
     import refinem
     version_file = open(os.path.join(__path__[0], 'VERSION'))
-    return version_file.read().strip()
+    return version_file.readline().strip()

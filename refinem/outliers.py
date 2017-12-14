@@ -21,7 +21,7 @@ import ast
 import itertools
 import logging
 from collections import defaultdict, namedtuple
-
+        
 from scipy.stats import pearsonr
 from numpy import (mean as np_mean)
 

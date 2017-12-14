@@ -149,44 +149,31 @@ if __name__ == '__main__':
     taxon_profile_parser.add_argument('--silent', help="suppress output of logger", action='store_true')
     
     # Identify outliers based on taxonomic assignments
-    if False:
-        taxon_filter_parser = subparsers.add_parser('taxon_filter',
-                                                formatter_class=CustomHelpFormatter,
-                                                description='Identify scaffolds with divergent taxonomic classification.')
-        taxon_filter_parser.add_argument('taxon_profile_dir', help="directory with results of taxon_profile command")
-        taxon_filter_parser.add_argument('output_file', help="file indicating divergent scaffolds")
-        taxon_filter_parser.add_argument('-g', '--genome_threshold', help='threshold for accepting taxonomic classification of genome', type=float, default=80.0)
-        taxon_filter_parser.add_argument('-p', '--min_classified_per', help='minimum percentage of genes with a classification to filter a scaffold', type=float, default=25.0)
-        taxon_filter_parser.add_argument('-a', '--min_scaffold_agreement', help='minimum percentage of genes congruent with genome classification to retain scaffold', type=float, default=10.0)
-        taxon_filter_parser.add_argument('-d', '--max_scaffold_disagreement', help='maximum percentage of genes supporting an alternative classifcation to retain scaffold', type=float, default=50.0)
-        taxon_filter_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=1)
-        taxon_filter_parser.add_argument('--silent', help="suppress output of logger", action='store_true')
-    else:
-        taxon_filter_parser = subparsers.add_parser('taxon_filter',
-                                            formatter_class=CustomHelpFormatter,
-                                            description='Identify scaffolds with divergent taxonomic classification.')
-        taxon_filter_parser.add_argument('taxon_profile_dir', help="directory with results of taxon_profile command")
-        taxon_filter_parser.add_argument('output_file', help="file indicating divergent scaffolds")
-        taxon_filter_parser.add_argument('--consensus_taxon', help='threshold for accepting a consensus taxon', type=float, default=50.0)
-        taxon_filter_parser.add_argument('--trusted_scaffold', help='threshold for treating a scaffold as trusted', type=float, default=50.0)
-        taxon_filter_parser.add_argument('--common_taxa', help='threshold for treating a taxon as common', type=float, default=5.0)
-        taxon_filter_parser.add_argument('--congruent_scaffold', help='threshold for treating a scaffold as congruent', type=float, default=10.0)
-        taxon_filter_parser.add_argument('--min_classified_per', help='minimum percentage of genes with a classification to filter a scaffold', type=float, default=25.0)
-        taxon_filter_parser.add_argument('--min_classified', help='minimum number of classified genes required to filter a scaffold', type=int, default=5)
-        taxon_filter_parser.add_argument('--consensus_scaffold', help='threshold of consensus taxon for filtering a scaffold', type=float, default=50.0)
-        taxon_filter_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=1)
-        taxon_filter_parser.add_argument('--silent', help="suppress output of logger", action='store_true')
-    
+    taxon_filter_parser = subparsers.add_parser('taxon_filter',
+                                        formatter_class=CustomHelpFormatter,
+                                        description='Identify scaffolds with divergent taxonomic classification.')
+    taxon_filter_parser.add_argument('taxon_profile_dir', help="directory with results of taxon_profile command")
+    taxon_filter_parser.add_argument('output_file', help="file indicating divergent scaffolds")
+    taxon_filter_parser.add_argument('--consensus_taxon', help='threshold for accepting a consensus taxon', type=float, default=50.0)
+    taxon_filter_parser.add_argument('--trusted_scaffold', help='threshold for treating a scaffold as trusted', type=float, default=50.0)
+    taxon_filter_parser.add_argument('--common_taxa', help='threshold for treating a taxon as common', type=float, default=5.0)
+    taxon_filter_parser.add_argument('--congruent_scaffold', help='threshold for treating a scaffold as congruent', type=float, default=10.0)
+    taxon_filter_parser.add_argument('--min_classified_per', help='minimum percentage of genes with a classification to filter a scaffold', type=float, default=25.0)
+    taxon_filter_parser.add_argument('--min_classified', help='minimum number of classified genes required to filter a scaffold', type=int, default=5)
+    taxon_filter_parser.add_argument('--consensus_scaffold', help='threshold of consensus taxon for filtering a scaffold', type=float, default=50.0)
+    taxon_filter_parser.add_argument('-c', '--cpus', help='number of CPUs to use', type=int, default=1)
+    taxon_filter_parser.add_argument('--silent', help="suppress output of logger", action='store_true')
+
     # Identify outlier sequences
     outlier_parser = subparsers.add_parser('outliers',
                                             formatter_class=CustomHelpFormatter,
                                             description='Identify scaffolds with divergent genomic characteristics.')
     outlier_parser.add_argument('scaffold_stats_file', help="file with statistics for each scaffold")
     outlier_parser.add_argument('output_dir', help="output directory")
-    outlier_parser.add_argument('--gc_perc', help='percentile for identify scaffolds with divergent GC content', type=int, choices=xrange(-1, 101), default=98, metavar='int')
-    outlier_parser.add_argument('--td_perc', help='percentile for identify scaffolds with divergent tetranucleotide signatures', type=int, choices=xrange(-1, 101), default=98, metavar='int')
-    outlier_parser.add_argument('--cov_corr', help='correlation for identifying scaffolds with divergent coverage profiles', type=float, default=0.8)
-    outlier_parser.add_argument('--cov_perc', help='mean absolute percent error for identifying scaffolds with divergent coverage profiles', type=int, choices=xrange(-1, 1001), default=50, metavar='int')
+    outlier_parser.add_argument('--gc_perc', help='percentile for identify scaffolds with divergent GC content', type=int, default=98, metavar='int')
+    outlier_parser.add_argument('--td_perc', help='percentile for identify scaffolds with divergent tetranucleotide signatures', type=int, default=98, metavar='int')
+    outlier_parser.add_argument('--cov_corr', help='correlation for identifying scaffolds with divergent coverage profiles', type=float, default=-2)
+    outlier_parser.add_argument('--cov_perc', help='mean absolute percent error for identifying scaffolds with divergent coverage profiles', type=int, default=50, metavar='int')
     outlier_parser.add_argument('-r', '--report_type', help="report sequences that are outliers in 'all' or 'any' reference distribution", choices=['any', 'all'], default='any')
     outlier_parser.add_argument('--no_plots', action="store_true", default=False, help='do not generate any plots')
     outlier_parser.add_argument('--individual_plots', action="store_true", default=False, help='create individual plots for each statistic')
