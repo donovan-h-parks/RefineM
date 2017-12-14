@@ -2,7 +2,7 @@
 
 **[This project is in active development. Documentation is fairly light. You are welcomed to use this software, but please expect it to change in non-trivial ways.]**
 
-_All users are encouraged to update to v0.0.21.  In previous versions, both a mean absolute error and correlation criteria were used to identify contigs with divergent coverage profiles. Starting with v0.0.21, only the mean absolute error criteria is used by default. The correlation criteria can be misleading with fewer han 6 data points (i.e., BAM files) so is not used by default. _
+_All users are encouraged to update to v0.0.21. In previous versions, both a mean absolute error and correlation criteria were used to identify contigs with divergent coverage profiles. Starting with v0.0.21, only the mean absolute error criteria is used by default. The correlation criteria can be misleading with fewer han 6 data points (i.e., BAM files) so is not used by default._
 
 [![version status](https://img.shields.io/pypi/v/refinem.svg)](https://pypi.python.org/pypi/refinem)
 
