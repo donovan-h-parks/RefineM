@@ -8,15 +8,15 @@ _All users are encouraged to update to v0.0.21. In previous versions, both a mea
 
 RefineM is a set of tools for improving population genomes. It provides methods designed to improve the completeness of a genome along with methods for identifying and removing contamination. RefineM comprises only part of a full genome QC pipeline and should be used in conjunction with existing QC tools such as [CheckM](https://github.com/Ecogenomics/CheckM/wiki). The functionality currently planned is:
 
-*Improve completeness:*
-* identify contigs with similarity to specific reference genome(s)
-* identify contigs with compatible GC, coverage, and tetranucleotide signatures
-* identify partial MAGs which should be merged together (requires [CheckM](https://github.com/Ecogenomics/CheckM/wiki))
-
 *Reducing contamination:*
 * taxonomically classify contigs within a genome in order to identify outliers
 * identify contigs with divergent GC content, coverage, or tetranucleotide signatures
-* identify contigs with a coding density suggestive of a Eukaryotic origin
+* identify contigs with a coding density suggestive of a Eukaryotic origin (in progress)
+
+*Improve completeness (in progress):*
+* identify contigs with similarity to specific reference genome(s)
+* identify contigs with compatible GC, coverage, and tetranucleotide signatures
+* identify partial MAGs which should be merged together (requires [CheckM](https://github.com/Ecogenomics/CheckM/wiki))
 
 ## Install
 
@@ -30,7 +30,7 @@ This package requires numpy to be installed and makes use of the follow bioinfor
 * [diamond](http://ab.inf.uni-tuebingen.de/software/diamond/) >=0.9.9: Buchfink B, Xie C, Huson DH. 2015. Fast and sensitive protein alignment using DIAMOND. *Nature Methods* 12: 59–60 doi:10.1038/nmeth.3176.
 * [krona](http://sourceforge.net/p/krona/home/krona/) >=2.7: Ondov BD, Bergman NH, and Phillippy AM. 2011. Interactive metagenomic visualization in a Web browser. *BMC Bioinformatics* 12: 385.
 
-## Quick start: identifying potential contamination
+## Identifying potential contamination
 
 RefineM can identify potential contamination based on the genomic properties (GC, tetranucleotide signatures, coverage) of scaffolds and based on their taxonomic assignment against a reference database.
 
