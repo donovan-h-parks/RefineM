@@ -8,15 +8,15 @@ _All users are encouraged to update to v0.0.21. In previous versions, both a mea
 
 RefineM is a set of tools for improving population genomes. It provides methods designed to improve the completeness of a genome along with methods for identifying and removing contamination. RefineM comprises only part of a full genome QC pipeline and should be used in conjunction with existing QC tools such as [CheckM](https://github.com/Ecogenomics/CheckM/wiki). The functionality currently planned is:
 
-*Improve completeness:*
-* identify contigs with similarity to specific reference genome(s)
-* identify contigs with compatible GC, coverage, and tetranucleotide signatures
-* identify partial MAGs which should be merged together (requires [CheckM](https://github.com/Ecogenomics/CheckM/wiki))
-
 *Reducing contamination:*
 * taxonomically classify contigs within a genome in order to identify outliers
 * identify contigs with divergent GC content, coverage, or tetranucleotide signatures
-* identify contigs with a coding density suggestive of a Eukaryotic origin
+* identify contigs with a coding density suggestive of a Eukaryotic origin (in progress)
+
+*Improve completeness (in progress):*
+* identify contigs with similarity to specific reference genome(s)
+* identify contigs with compatible GC, coverage, and tetranucleotide signatures
+* identify partial MAGs which should be merged together (requires [CheckM](https://github.com/Ecogenomics/CheckM/wiki))
 
 ## Install
 
@@ -30,7 +30,7 @@ This package requires numpy to be installed and makes use of the follow bioinfor
 * [diamond](http://ab.inf.uni-tuebingen.de/software/diamond/) >=0.9.9: Buchfink B, Xie C, Huson DH. 2015. Fast and sensitive protein alignment using DIAMOND. *Nature Methods* 12: 59–60 doi:10.1038/nmeth.3176.
 * [krona](http://sourceforge.net/p/krona/home/krona/) >=2.7: Ondov BD, Bergman NH, and Phillippy AM. 2011. Interactive metagenomic visualization in a Web browser. *BMC Bioinformatics* 12: 385.
 
-## Quick start: identifying potential contamination
+## Identifying potential contamination
 
 RefineM can identify potential contamination based on the genomic properties (GC, tetranucleotide signatures, coverage) of scaffolds and based on their taxonomic assignment against a reference database.
 
@@ -70,9 +70,9 @@ where <gene_output_dir> is the output of the call_genes command, <stats_output_d
 
 Scaffolds with divergent taxonomic assignments can then be identified with:
 ```
->refinem taxon_filter -c 40 <taxon_profile_output_dir> taxon_filter.tsv
+>refinem taxon_filter -c 40 <taxon_profile_dir> taxon_filter.tsv
 ```
-where <taxon_profile_output_dir> is the output directory of the taxon_profile command and scaffolds determined to be contamination are written to taxon_filter.tsv. If desired, you can modify the criteria used by RefineM to identify potential contamination (see refinem taxon_filter -h).
+where <taxon_profile_dir> is the output directory of the taxon_profile command and scaffolds determined to be contamination are written to taxon_filter.tsv. If desired, you can modify the criteria used by RefineM to identify potential contamination (see refinem taxon_filter -h).
 
 Contaminating scaffolds can be removed from your bins as follows:
 ```
@@ -80,16 +80,29 @@ Contaminating scaffolds can be removed from your bins as follows:
 ```
 where <bin_dir> is the directory containing your bins to be modified, taxon_filter.tsv indicates the scaffolds to remove from each bin and is produced by the taxon_filter command, and <filtered_output_dir> will contain your bins with the specified scaffolds removed. If your only want the output directory to contain bins that were modified, you can use the --modified_only flag.
 
+### Removing contigs with incongruent 16S rRNA genes
+
+Scaffolds with 16S rRNA genes that appear incongruent with the taxonomic identity of a bin can be identified as follows:
+```
+>refinem ssu_erroneous <bin_dir> <taxon_profile_dir> <ssu_db> <reference_taxonomy> <ssu_output_dir>
+```
+where <bin_dir> is the directory containing your bins, <taxon_profile_dir> is the output directory of the taxon_profile command, and the <ssu_db> and <reference_taxonomy> are reference database for establishing the taxonomic identity of 16S rRNA genes. Reference files and their format are discussed [below](#reference-database-and-taxonomy-files). Output files will be placed in the <ssu_output_dir>. The file ssu_erroneous.tsv lists genomes and corresponding scaffolds that may have erroneous 16S rRNA genes. The genome classification indicates the percentage of genes which support each taxon assignment (e.g., d__Bacteria (99%)) and the 16S rRNA classification indicates the taxonomic assignment of the top hit in the reference 16S rRNA database. The E-value, alignment length, and percent identiyt of the top hit is provide in order to allow the quality of the top hits to be assessed. It is recommended that this file be inspected and your judgement be used to decide which contigs so be deemed erroneous. Contigs specified in the ssu_erroneous.tsv file can be removed from bins using the filter_bins method of RefineM.
+
 ## Reference database and taxonomy files
 
-A reference protein database and corresponding taxonomy file can be obtained from https://data.ace.uq.edu.au/public/misc_downloads/refinem/. This database consists of proteins from the dereplicated set of genomes used to define the Genome Taxonomy Database (GTDB: http://gtdb.ecogenomic.org/).
+Reference protein and 16S rRNA databases and a corresponding taxonomy file can be obtained from https://data.ace.uq.edu.au/public/misc_downloads/refinem/. These databases are constructed from the dereplicated set of genomes used to define the Genome Taxonomy Database (GTDB: http://gtdb.ecogenomic.org/). The taxonomy file can be used with both the protein and 16S rRNA databases.
 
-If you wish to make you own reference database, the protein sequences must be formatted into a DIAMOND database and have header information in the format <genome_id>~<contig_id>_<gene_num>, e.g.:
+If you wish to make you own reference protein database, the protein sequences must be formatted into a DIAMOND database and have header information in the format <genome_id>~<contig_id>_<gene_num>, e.g.:
 ```
 >GCF_001687105.1~contig000001_1
 ```
 
-Taxonomy information for the reference genomes must be provided in a seperate taxonomy file. This file is a simple tab-separated values file with two columns indicating the genome ID and Greengenes-style taxonomy string, e.g.:
+If you wish to make you own 16S rRNA database, the sequences must be formatted into a BLASTN database and have the genome identifier in the FASTA header, e.g.:
+```
+>GCF_001687105.1
+``` 
+
+Taxonomy information for reference genomes must be provided in a seperate taxonomy file. This file is a simple tab-separated values file with two columns indicating the genome ID and Greengenes-style taxonomy string, e.g.:
 ```
 >GCF_001687105.1    d__Bacteria;p__Proteobacteria;c__Alphaproteobacteria;o__Rhodobacterales;f__Rhodobacteraceae;g__Yangia;s__
 ```
