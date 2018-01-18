@@ -21,6 +21,9 @@ import ast
 import itertools
 import logging
 from collections import defaultdict, namedtuple
+
+import numpy
+numpy.seterr(all='raise') #***
         
 from scipy.stats import pearsonr
 from numpy import (mean as np_mean)
@@ -375,8 +378,8 @@ class Outliers():
                     # however, this scaffold has no reported 
                     # coverage so flag it as a likely outlier
                     mean_scaffold_cov = 0
-                    corr_r = -1
-                    mean_cp = -1
+                    corr_r = -1000
+                    mean_cp_err = -1000
                     outlying_dists[scaffold_id].append('COV_CORR')
                     outlying_dists[scaffold_id].append('COV_PERC')
                 else:     
@@ -388,20 +391,19 @@ class Outliers():
                         if corr_r < cov_corr:
                             outlying_dists[scaffold_id].append('COV_CORR')
 
-                    mean_cp = []
+                    mean_cp_err = []
                     for cov_genome, cov_scaffold in itertools.izip(gs.median_coverage, stats.coverage):
-                        if cov_genome >= self.min_required_coverage:
-                            mean_cp.append(abs(cov_scaffold - cov_genome) * 100.0 / cov_genome)
-
-                    mean_cp = np_mean(mean_cp)
-                    if mean_cp > cov_perc:
+                        mean_cp_err.append(abs(cov_scaffold - cov_genome) * 100.0 / max(cov_genome, self.min_required_coverage))
+                            
+                    mean_cp_err = np_mean(mean_cp_err)                        
+                    if mean_cp_err > cov_perc:
                         outlying_dists[scaffold_id].append('COV_PERC')
             else:
                 # no coverage information was provided
                 mean_genome_cov = 0
                 mean_scaffold_cov = 0
                 corr_r = 1.0
-                mean_cp = 0.0
+                mean_cp_err = 0.0
                 
                 
             outlying_stats[scaffold_id] = self.OutlierInfo(stats.length,
@@ -415,7 +417,7 @@ class Outliers():
                                                             mean_scaffold_cov,
                                                             mean_genome_cov,
                                                             corr_r,
-                                                            mean_cp)
+                                                            mean_cp_err)
         
         return outlying_stats, outlying_dists
 
@@ -687,7 +689,11 @@ class Outliers():
             genome_scaffold_stats = {}
             for scaffold_id in scaffold_stats.scaffolds_in_genome[genome_id]:
                 genome_scaffold_stats[scaffold_id] = scaffold_stats.stats[scaffold_id]
-
+                
+            if len(genome_scaffold_stats) <= 1:
+                self.logger.info('Skipping plots for %s as it contains only %d contigs.' % (genome_id, len(genome_scaffold_stats)))
+                continue
+                
             if individual_plots:
                 # GC plot
                 gc_plots = GcPlots(plot_options)

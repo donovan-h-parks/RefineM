@@ -1,4 +1,9 @@
+0.0.22
+- improved handling of genomes comprised on a single contig
+- proper installation of HMMs used to identify SSU genes
+
 0.0.21
 - allowed any value to be used for identify outliers with the 'outlier' method
   as this permits users to set values that effectively disable the filter
+  
 0.0.20
