@@ -2,7 +2,7 @@
 
 **[This project is in active development. Documentation is fairly light. You are welcomed to use this software, but please expect it to change in non-trivial ways.]**
 
-_All users are encouraged to update to v0.0.21. In previous versions, both a mean absolute error and correlation criteria were used to identify contigs with divergent coverage profiles. Starting with v0.0.21, only the mean absolute error criteria is used by default. The correlation criteria can be misleading with fewer than 6 data points (i.e., BAM files) so is not used by default._
+_All users are encouraged to update to v0.0.22. In previous versions, both a mean absolute error and correlation criteria were used to identify contigs with divergent coverage profiles. Starting with v0.0.21, only the mean absolute error criteria is used by default. The correlation criteria can be misleading with fewer than 6 data points (i.e., BAM files) so is not used by default. Use of the ssu_erroneous method requires v0.0.22._
 
 [![version status](https://img.shields.io/pypi/v/refinem.svg)](https://pypi.python.org/pypi/refinem)
 
@@ -80,7 +80,7 @@ Contaminating scaffolds can be removed from your bins as follows:
 ```
 where <bin_dir> is the directory containing your bins to be modified, taxon_filter.tsv indicates the scaffolds to remove from each bin and is produced by the taxon_filter command, and <filtered_output_dir> will contain your bins with the specified scaffolds removed. If your only want the output directory to contain bins that were modified, you can use the --modified_only flag.
 
-### Removing contigs with incongruent 16S rRNA genes
+### Removing contigs with incongruent 16S rRNA genes (requires version >=0.0.22)
 
 Scaffolds with 16S rRNA genes that appear incongruent with the taxonomic identity of a bin can be identified as follows:
 ```
