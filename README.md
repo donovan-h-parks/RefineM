@@ -70,9 +70,9 @@ where <gene_output_dir> is the output of the call_genes command, <stats_output_d
 
 Scaffolds with divergent taxonomic assignments can then be identified with:
 ```
->refinem taxon_filter -c 40 <taxon_profile_output_dir> taxon_filter.tsv
+>refinem taxon_filter -c 40 <taxon_profile_dir> taxon_filter.tsv
 ```
-where <taxon_profile_output_dir> is the output directory of the taxon_profile command and scaffolds determined to be contamination are written to taxon_filter.tsv. If desired, you can modify the criteria used by RefineM to identify potential contamination (see refinem taxon_filter -h).
+where <taxon_profile_dir> is the output directory of the taxon_profile command and scaffolds determined to be contamination are written to taxon_filter.tsv. If desired, you can modify the criteria used by RefineM to identify potential contamination (see refinem taxon_filter -h).
 
 Contaminating scaffolds can be removed from your bins as follows:
 ```
@@ -80,16 +80,24 @@ Contaminating scaffolds can be removed from your bins as follows:
 ```
 where <bin_dir> is the directory containing your bins to be modified, taxon_filter.tsv indicates the scaffolds to remove from each bin and is produced by the taxon_filter command, and <filtered_output_dir> will contain your bins with the specified scaffolds removed. If your only want the output directory to contain bins that were modified, you can use the --modified_only flag.
 
+### Removing contigs with incongruent 16S rRNA genes
+
+Scaffolds with 16S rRNA genes that appear incongruent with the taxonomic identity of a bin can be identified as follows:
+```
+>refinem ssu_erroneous <bin_dir> <taxon_profile_dir> <ssu_db> <reference_taxonomy> <ssu_output_dir>
+```
+where <bin_dir> is the directory containing your bins, <taxon_profile_dir> is the output directory of the taxon_profile command, and the <ssu_db> and <reference_taxonomy> are reference database for establishing the taxonomic identity of 16S rRNA genes. Reference files and their format are discussed [below](#reference-database-and-taxonomy-files). Output files will be placed in the <ssu_output_dir>. 
+
 ## Reference database and taxonomy files
 
-A reference protein database and corresponding taxonomy file can be obtained from https://data.ace.uq.edu.au/public/misc_downloads/refinem/. This database consists of proteins from the dereplicated set of genomes used to define the Genome Taxonomy Database (GTDB: http://gtdb.ecogenomic.org/).
+Reference protein and 16S rRNA databases and a corresponding taxonomy file can be obtained from https://data.ace.uq.edu.au/public/misc_downloads/refinem/. These databases are constructed from the dereplicated set of genomes used to define the Genome Taxonomy Database (GTDB: http://gtdb.ecogenomic.org/). The taxonomy file can be used with both the protein and 16S rRNA databases.
 
-If you wish to make you own reference database, the protein sequences must be formatted into a DIAMOND database and have header information in the format <genome_id>~<contig_id>_<gene_num>, e.g.:
+If you wish to make you own reference protein database, the protein sequences must be formatted into a DIAMOND database and have header information in the format <genome_id>~<contig_id>_<gene_num>, e.g.:
 ```
 >GCF_001687105.1~contig000001_1
 ```
 
-Taxonomy information for the reference genomes must be provided in a seperate taxonomy file. This file is a simple tab-separated values file with two columns indicating the genome ID and Greengenes-style taxonomy string, e.g.:
+Taxonomy information for reference genomes must be provided in a seperate taxonomy file. This file is a simple tab-separated values file with two columns indicating the genome ID and Greengenes-style taxonomy string, e.g.:
 ```
 >GCF_001687105.1    d__Bacteria;p__Proteobacteria;c__Alphaproteobacteria;o__Rhodobacterales;f__Rhodobacteraceae;g__Yangia;s__
 ```
