@@ -37,8 +37,6 @@ from biolib.external.diamond import Diamond
 from biolib.taxonomy import Taxonomy
 from biolib.plots.krona import Krona
 
-from numpy import mean
-
 from refinem import version
 from refinem.common import concatenate_gene_files
 from refinem.scaffold_stats import ScaffoldStats
@@ -48,6 +46,17 @@ from refinem.scaffold_stats import ScaffoldStats
 To Do:
     Get some form of gene annotation into the mix?
 """
+
+def mean(v):
+    """Calculate mean of values.
+    
+    This is a weird workaround. Ideally, numpy.mean would be used. However,
+    this is causing an issue with small numbers, e.g. mean([0.0, 5.3e-10]).
+    This seems to work if entered directly into the Python console, but 
+    not while running RefineM. I have been unable to determine why.
+    """
+    
+    return sum(v) / len(v)
 
 
 class TaxonProfile(object):
@@ -92,7 +101,7 @@ class TaxonProfile(object):
 
         # profile for each genome
         self.profiles = {}
-
+        
     def taxonomic_profiles(self, table, taxonomy):
         """Create taxonomic profiles.
 

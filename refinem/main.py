@@ -207,7 +207,7 @@ class OptionsParser():
 
     def taxon_profile(self, options):
         """Call genes command"""
-        
+
         make_sure_path_exists(options.output_dir)
         check_file_exists(options.scaffold_stats_file)
         check_file_exists(options.taxonomy_file)
