@@ -58,7 +58,7 @@ where <bin_dir> is the directory containing your bins to be modified, outliers.t
 
 To identify scaffolds with taxonomic assignments that are divergent from the taxonomic affliations of a bin, the genes in each scaffold/contig are classified against a reference database using DIAMOND. You can call genes on all your genomes using:
 ```
->refinem call_genes -c 40 bins <bin_dir> <gene_output_dir>
+>refinem call_genes -c 40 <bin_dir> <gene_output_dir>
 ```
 where <bin_dir> is the directory containing your bins and the directory <gene_output_dir> will contain called genes for your bins. 
 
@@ -86,7 +86,7 @@ Scaffolds with 16S rRNA genes that appear incongruent with the taxonomic identit
 ```
 >refinem ssu_erroneous <bin_dir> <taxon_profile_dir> <ssu_db> <reference_taxonomy> <ssu_output_dir>
 ```
-where <bin_dir> is the directory containing your bins, <taxon_profile_dir> is the output directory of the taxon_profile command, and the <ssu_db> and <reference_taxonomy> are reference database for establishing the taxonomic identity of 16S rRNA genes. Reference files and their format are discussed [below](#reference-database-and-taxonomy-files). Output files will be placed in the <ssu_output_dir>. The file ssu_erroneous.tsv lists genomes and corresponding scaffolds that may have erroneous 16S rRNA genes. The genome classification indicates the percentage of genes which support each taxon assignment (e.g., d__Bacteria (99%)) and the 16S rRNA classification indicates the taxonomic assignment of the top hit in the reference 16S rRNA database. The E-value, alignment length, and percent identiyt of the top hit is provide in order to allow the quality of the top hits to be assessed. It is recommended that this file be inspected and your judgement be used to decide which contigs so be deemed erroneous. Contigs specified in the ssu_erroneous.tsv file can be removed from bins using the filter_bins method of RefineM.
+where <bin_dir> is the directory containing your bins, <taxon_profile_dir> is the output directory of the taxon_profile command, and the <ssu_db> and <reference_taxonomy> are reference database for establishing the taxonomic identity of 16S rRNA genes. Reference files and their format are discussed [below](#reference-database-and-taxonomy-files). Output files will be placed in the <ssu_output_dir>. The file ssu_erroneous.tsv lists genomes and corresponding scaffolds that may have erroneous 16S rRNA genes. The genome classification indicates the percentage of genes which support each taxon assignment (e.g., d__Bacteria (99%)) and the 16S rRNA classification indicates the taxonomic assignment of the top hit in the reference 16S rRNA database. The E-value, alignment length, and percent identity of the top hit is provide in order to allow the quality of the top hits to be assessed. It is recommended that this file be inspected and your judgement be used to decide which contigs should be deemed erroneous. Contigs specified in the ssu_erroneous.tsv file can be removed from bins using the filter_bins method of RefineM.
 
 ## Reference database and taxonomy files
 
