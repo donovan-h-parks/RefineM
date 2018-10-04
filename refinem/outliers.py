@@ -387,9 +387,16 @@ class Outliers():
 
                     corr_r = 1.0
                     if len(gs.median_coverage) > 1:
-                        corr_r, _corr_p = pearsonr(gs.median_coverage, stats.coverage)
-                        if corr_r < cov_corr:
-                            outlying_dists[scaffold_id].append('COV_CORR')
+                        try:
+                            corr_r, _corr_p = pearsonr(gs.median_coverage, stats.coverage)
+                            if corr_r < cov_corr:
+                                outlying_dists[scaffold_id].append('COV_CORR')
+                        except:
+                            self.logger.warning('Failed to calculate Pearson correlation for %s.' % scaffold_id)
+                            if sum(gs.median_coverage) == 0:
+                                self.logger.warning('Median coverage of %s is zero across all samples.' % genome_id)
+                            if sum(stats.coverage) == 0:
+                                self.logger.warning('Contig %s has zero coverage across all samples.' % scaffold_id)
 
                     mean_cp_err = []
                     for cov_genome, cov_scaffold in itertools.izip(gs.median_coverage, stats.coverage):

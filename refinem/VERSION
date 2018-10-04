@@ -1,5 +1,9 @@
+0.0.24
+- skip contigs where Pearson correlation cannot be calculated due to zero coverage
+
 0.0.23
 - implemented workaround for "FloatingPointError: underflow encountered in double_scalars" when using numpy.mean on small number (e.g., 1e-310)
+
 0.0.22
 - improved handling of genomes comprised on a single contig
 - proper installation of HMMs used to identify SSU genes

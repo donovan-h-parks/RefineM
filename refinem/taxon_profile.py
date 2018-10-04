@@ -33,6 +33,7 @@ from biolib.common import (make_sure_path_exists,
                             alphanumeric_sort,
                             remove_extension)
 from biolib.blast_parser import BlastParser
+from biolib.external.execute import check_dependencies
 from biolib.external.diamond import Diamond
 from biolib.taxonomy import Taxonomy
 from biolib.plots.krona import Krona
@@ -93,8 +94,10 @@ class TaxonProfile(object):
         output_dir : str
             Directory to store results.
         """
-        
+
         self.logger = logging.getLogger('timestamp')
+        
+        check_dependencies(('diamond', 'ktImportText'))
 
         self.cpus = cpus
         self.output_dir = output_dir

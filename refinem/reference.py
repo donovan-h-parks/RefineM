@@ -28,6 +28,7 @@ import operator
 from collections import defaultdict
 
 import biolib.seq_io as seq_io
+from biolib.external.execute import check_dependencies
 from biolib.common import make_sure_path_exists
 from biolib.blast_parser import BlastParser
 from biolib.external.diamond import Diamond
@@ -57,8 +58,10 @@ class Reference(object):
         output_dir : str
             Directory to store results.
         """
-        
+
         self.logger = logging.getLogger('timestamp')
+        
+        check_dependencies(('diamond', 'ktImportText'))
 
         self.cpus = cpus
         self.output_dir = output_dir

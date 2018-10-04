@@ -50,7 +50,6 @@ from biolib.common import (make_sure_path_exists,
 from biolib.external.prodigal import Prodigal
 from biolib.external.execute import check_dependencies
 
-
 class OptionsParser():
     def __init__(self):
         """Initialization"""
@@ -672,8 +671,6 @@ class OptionsParser():
 
     def parse_options(self, options):
         """Parse user options and call the correct pipeline(s)"""
-
-        check_dependencies(('diamond', 'ktImportText'))
 
         if(options.subparser_name == 'scaffold_stats'):
             self.scaffold_stats(options)
