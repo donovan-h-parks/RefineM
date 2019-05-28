@@ -40,7 +40,7 @@ To identify scaffolds with genomic properties that are divergent from the expect
 ```
 >refinem scaffold_stats -c 16 <scaffold_file> <bin_dir> <stats_output_dir> <bam_files>
 ```
-where <scaffold_file> is a FASTA file containing the scaffolds/contigs binned to produce your bins, <bin_dir> is the directory containing your bins, <stats_output_dir> is the directory to store results, and <bam_files> is one are more index BAM files specifying the mapping of reads to the scaffolds/contigs. The number of CPUs to use can be specified with the -c flag.
+where <scaffold_file> is a FASTA file containing the scaffolds/contigs binned to produce your bins, <bin_dir> is the directory containing your bins, <stats_output_dir> is the directory to store results, and <bam_files> is one or more index BAM files specifying the mapping of reads to the scaffolds/contigs. The number of CPUs to use can be specified with the -c flag.
 
 Scaffolds with divergent genomic properties can then be identified using:
 ```
