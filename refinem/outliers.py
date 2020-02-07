@@ -90,9 +90,10 @@ class Outliers():
         genome_seqs = seq_io.read(genome_file)
         if not genome_seqs:
             return
-
+        bin_name = os.path.splitext(os.path.basename(genome_file))[0]
         # remove scaffolds
         bModified = False
+        rtn = None
         with open(outlier_file) as f:
             f.readline()
 
@@ -102,7 +103,8 @@ class Outliers():
                     
                 line_split = line.split('\t')
                 scaffold_id = line_split[0]
-                rtn = genome_seqs.pop(scaffold_id, None)
+                if line_split[1] == bin_name:
+                    rtn = genome_seqs.pop(scaffold_id, None)
                 if rtn:
                     bModified = True
 
