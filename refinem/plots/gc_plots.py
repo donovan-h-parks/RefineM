@@ -47,7 +47,7 @@ class GcPlots(BasePlot):
         """
         
         pts = {}
-        for scaffold_id, stats in genome_scaffold_stats.iteritems():
+        for scaffold_id, stats in genome_scaffold_stats.items():
             pts[scaffold_id] = (stats.gc - mean_gc, stats.length / 1000.0)
 
         return pts
@@ -142,13 +142,13 @@ class GcPlots(BasePlot):
         axes_scatter.plot([0, 0], [0, ymax], linestyle='dashed', color=self.axes_colour, lw=1.0, zorder=0)
 
         # plot reference distributions
-        closest_gc = find_nearest(np.array(gc_dist.keys()), mean_gc / 100)
+        closest_gc = find_nearest(list(gc_dist.keys()), mean_gc / 100)
         for percentile in percentiles_to_plot:
             # find closest distribution values
-            temp_scaffold_len = gc_dist[closest_gc].keys()[0]
+            temp_scaffold_len = list(gc_dist[closest_gc].keys())[0]
             d = gc_dist[closest_gc][temp_scaffold_len]
-            gc_lower_bound_key = find_nearest(d.keys(), (100 - percentile) / 2.0)
-            gc_upper_bound_key = find_nearest(d.keys(), (100 + percentile) / 2.0)
+            gc_lower_bound_key = find_nearest(list(d.keys()), (100 - percentile) / 2.0)
+            gc_upper_bound_key = find_nearest(list(d.keys()), (100 + percentile) / 2.0)
 
             xL = []
             xU = []

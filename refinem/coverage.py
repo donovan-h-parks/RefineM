@@ -94,7 +94,7 @@ class Coverage():
         for bam_file in bam_files:
             if not os.path.exists(bam_file + '.bai'):
                 self.logger.error('BAM index file is missing: ' + bam_file + '.bai\n')
-                sys.exit()
+                sys.exit(-1)
 
         # calculate coverage of each BAM file
         coverage_info = {}
@@ -111,8 +111,9 @@ class Coverage():
             header += '\t' + bam_id
         fout.write(header + '\n')
 
-        for seq_id in coverage_info[coverage_info.keys()[0]].keys():
-            row_str = seq_id + '\t' + str(coverage_info[coverage_info.keys()[0]][seq_id].seq_len)
+        first_key = list(coverage_info.keys())[0]
+        for seq_id in coverage_info[first_key].keys():
+            row_str = seq_id + '\t' + str(coverage_info[first_key][seq_id].seq_len)
             for bam_file in bam_files:
                 bam_id = remove_extension(bam_file)
                 if seq_id in coverage_info[bam_file]:
@@ -176,7 +177,7 @@ class Coverage():
             writer_queue.put((None, None, None, None, None, None, None, None, None, None, None))
             write_proc.join()
         except:
-            print traceback.format_exc()
+            print(traceback.format_exc())
             for p in worker_proc:
                 p.terminate()
 
@@ -277,14 +278,30 @@ class Coverage():
         total_mapped_reads = 0
 
         processed_ref_seqs = 0
+        report_read_count = 0
         while True:
-            seq_id, seq_len, coverage, num_reads, num_duplicates, num_secondary, num_failed_qc, num_failed_align_len, num_failed_edit_dist, num_failed_proper_pair, num_mapped_reads = writer_queue.get(block=True, timeout=None)
+            (seq_id, 
+                seq_len, 
+                coverage, 
+                num_reads, 
+                num_duplicates, 
+                num_secondary, 
+                num_failed_qc, 
+                num_failed_align_len, 
+                num_failed_edit_dist, 
+                num_failed_proper_pair, 
+                num_mapped_reads) = writer_queue.get(block=True, timeout=None)
             if seq_id == None:
                 break
 
-            if not self.logger.is_silent:
-                processed_ref_seqs += 1
-                statusStr = '  Finished processing %d of %d (%.2f%%) reference sequences.' % (processed_ref_seqs, num_reference_seqs, float(processed_ref_seqs) * 100 / num_reference_seqs)
+            processed_ref_seqs += 1
+            report_read_count += 1
+            if not self.logger.is_silent and report_read_count == 100:
+                report_read_count = 0
+                statusStr = '  Finished processing {:,} of {:,} ({:.2f}%) reference sequences.'.format(
+                                    processed_ref_seqs, 
+                                    num_reference_seqs, 
+                                    float(processed_ref_seqs) * 100 / num_reference_seqs)
                 sys.stderr.write('%s\r' % statusStr)
                 sys.stderr.flush()
 
@@ -300,17 +317,22 @@ class Coverage():
             coverage_info[seq_id] = CoverageStruct(seq_len=seq_len, mapped_reads=num_mapped_reads, coverage=coverage)
 
         if not self.logger.is_silent:
-            sys.stderr.write('\n')
+            statusStr = '  Finished processing {:,} of {:,} ({:.2f}%) reference sequences.'.format(
+                                    processed_ref_seqs, 
+                                    num_reference_seqs, 
+                                    float(processed_ref_seqs) * 100 / num_reference_seqs)
+            sys.stderr.write('%s\n' % statusStr)
+            sys.stderr.flush()
 
         self.reporter.info('')
-        self.reporter.info('  # total reads: %d' % total_reads)
-        self.reporter.info('    # properly mapped reads: %d (%.1f%%)' % (total_mapped_reads, float(total_mapped_reads) * 100 / total_reads))
-        self.reporter.info('    # duplicate reads: %d (%.1f%%)' % (total_duplicates, float(total_duplicates) * 100 / total_reads))
-        self.reporter.info('    # secondary reads: %d (%.1f%%)' % (total_secondary, float(total_secondary) * 100 / total_reads))
-        self.reporter.info('    # reads failing QC: %d (%.1f%%)' % (total_failed_qc, float(total_failed_qc) * 100 / total_reads))
-        self.reporter.info('    # reads failing alignment length: %d (%.1f%%)' % (total_failed_align_len, float(total_failed_align_len) * 100 / total_reads))
-        self.reporter.info('    # reads failing edit distance: %d (%.1f%%)' % (total_failed_edit_dist, float(total_failed_edit_dist) * 100 / total_reads))
-        self.reporter.info('    # reads not properly paired: %d (%.1f%%)' % (total_failed_proper_pair, float(total_failed_proper_pair) * 100 / total_reads))
+        self.reporter.info('  # total reads: {:,}'.format(total_reads))
+        self.reporter.info('    # properly mapped reads: {:,} ({:.2f}%)'.format(total_mapped_reads, float(total_mapped_reads) * 100 / total_reads))
+        self.reporter.info('    # duplicate reads: {:,} ({:.2f}%)'.format(total_duplicates, float(total_duplicates) * 100 / total_reads))
+        self.reporter.info('    # secondary reads: {:,} ({:.2f}%)'.format(total_secondary, float(total_secondary) * 100 / total_reads))
+        self.reporter.info('    # reads failing QC: {:,} ({:.2f}%)'.format(total_failed_qc, float(total_failed_qc) * 100 / total_reads))
+        self.reporter.info('    # reads failing alignment length: {:,} ({:.2f}%)'.format(total_failed_align_len, float(total_failed_align_len) * 100 / total_reads))
+        self.reporter.info('    # reads failing edit distance: {:,} ({:.2f}%)'.format(total_failed_edit_dist, float(total_failed_edit_dist) * 100 / total_reads))
+        self.reporter.info('    # reads not properly paired: {:,} ({:.2f}%)'.format(total_failed_proper_pair, float(total_failed_proper_pair) * 100 / total_reads))
 
     def read(self, coverage_file):
         """Read coverage information from file.
@@ -346,11 +368,11 @@ class Coverage():
                         coverage[scaffold_id][bam_ids[i]] = float(cov)
         except IOError:
             self.logger.error('Failed to open signature file: %s' % coverage_file)
-            sys.exit()
+            sys.exit(-1)
         except:
-            print traceback.format_exc()
-            print ''
+            print(traceback.format_exc())
+            print('')
             raise ParsingError("[Error] Failed to process coverage file: " + coverage_file)
-            sys.exit()
+            sys.exit(-1)
 
         return coverage, length

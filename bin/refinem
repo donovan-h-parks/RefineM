@@ -1,4 +1,5 @@
-#!/srv/sw/python/2.7.4/bin/python
+#!/usr/bin/env python
+
 ###############################################################################
 #                                                                             #
 #    This program is free software: you can redistribute it and/or modify     #
@@ -49,12 +50,30 @@ To Do:
    that this bin doesn't have an mer gene).
 """
 
+"""
+Removed from CLI with Python 3 port:
+    Improve completeness:
+     reference      -> Identify scaffolds with similarity to specific reference genome(s)
+     compatible     -> Identify scaffolds with compatible GC, coverage, and tetranucleotide signatures
+     
+    Cluster:
+     kmeans         -> Partition bin with k-means clustering
+     dbscan         -> [not implemented] Partition bin with DBSCAN clustering
+     split          -> Split bin into exactly two partitions using genomic feature thresholds
+     manual         -> Partition bin into clusters based on manual assignment
+     
+    Genome validation and exploration:
+     unique         -> Ensure scaffolds are assigned to a single genome
+     unbinned       -> Identify unbinned scaffolds
+     bin_compare    -> Compare two sets of genomes (e.g., from alternative binning methods)
+"""
+
 def print_help():
     """Help menu."""
 
-    print ''
-    print '                ...::: RefineM v' + version() + ' :::...'''
-    print '''\
+    print('')
+    print('                ...::: RefineM v' + version() + ' :::...''')
+    print('''\
 
     Scaffold statistics:
      scaffold_stats -> Calculate statistics for scaffolds
@@ -66,26 +85,9 @@ def print_help():
      taxon_filter   -> Identify scaffolds with divergent taxonomic classification
      ssu_erroneous  -> Identify scaffolds with erroneous 16S rRNA genes
 
-    Improve completeness:
-     reference      -> Identify scaffolds with similarity to specific reference genome(s)
-     compatible     -> Identify scaffolds with compatible GC, coverage, and tetranucleotide signatures
-     merge          -> [not implemented] Identify partial genomes which should be merged together (requires CheckM)
-     
-    Cluster:
-     kmeans         -> Partition bin with k-means clustering
-     dbscan         -> [not implemented] Partition bin with DBSCAN clustering
-     split          -> Split bin into exactly two partitions using genomic feature thresholds
-     manual         -> Partition bin into clusters based on manual assignment
-
     Modify genome(s):
      modify_bin     -> Modify scaffolds in a single bin
      filter_bins    -> Remove scaffolds across a set of bins
-
-    Genome validation and exploration:
-     unique         -> Ensure scaffolds are assigned to a single genome
-     unbinned       -> Identify unbinned scaffolds
-     bin_compare    -> Compare two sets of genomes (e.g., from alternative binning methods)
-     bin_union      -> [not implemented] Merge multiple binning efforts into a single bin set
 
     Utility functions:
      call_genes     -> Identify genes within genomes
@@ -94,7 +96,7 @@ def print_help():
 
   Feature requests or bug reports can be sent to Donovan Parks (donovan.parks@gmail.com)
     or posted on GitHub (https://github.com/dparks1134/refinem).
-    '''
+    ''')
 
 if __name__ == '__main__':
 
@@ -175,7 +177,7 @@ if __name__ == '__main__':
     outlier_parser.add_argument('--cov_corr', help='correlation for identifying scaffolds with divergent coverage profiles', type=float, default=-2)
     outlier_parser.add_argument('--cov_perc', help='mean absolute percent error for identifying scaffolds with divergent coverage profiles', type=int, default=50, metavar='int')
     outlier_parser.add_argument('-r', '--report_type', help="report sequences that are outliers in 'all' or 'any' reference distribution", choices=['any', 'all'], default='any')
-    outlier_parser.add_argument('--no_plots', action="store_true", default=False, help='do not generate any plots')
+    outlier_parser.add_argument('--create_plots', action="store_true", default=False, help='create exploratory plots (currently unstable due to mpld3 limitations)')
     outlier_parser.add_argument('--individual_plots', action="store_true", default=False, help='create individual plots for each statistic')
     outlier_parser.add_argument('--image_type', default='png', choices=['eps', 'pdf', 'png', 'ps', 'svg'], help='desired image type')
     outlier_parser.add_argument('--point_size', type=int, default=36, help='desired size of points in scatterplot')
@@ -288,11 +290,11 @@ if __name__ == '__main__':
     compatible_parser.add_argument('output_dir', help="output directory")
 
     compatible_parser.add_argument('--min_genes', help="minimum required genes to consider for compatibility", type=int, default=3)
-    compatible_parser.add_argument('--perc_genes', help="percentage of genes with homology to reference genomes to consider scaffold compatible", type=int, choices=xrange(0, 101), default=50, metavar='int')
-    compatible_parser.add_argument('--gc_perc', help='percentile for identify scaffolds with compatible GC content', type=int, choices=xrange(0, 101), default=95, metavar='int')
-    compatible_parser.add_argument('--td_perc', help='percentile for identify scaffolds with compatible tetranucleotide signatures', type=int, choices=xrange(0, 101), default=95, metavar='int')
+    compatible_parser.add_argument('--perc_genes', help="percentage of genes with homology to reference genomes to consider scaffold compatible", type=int, choices=range(0, 101), default=50, metavar='int')
+    compatible_parser.add_argument('--gc_perc', help='percentile for identify scaffolds with compatible GC content', type=int, choices=range(0, 101), default=95, metavar='int')
+    compatible_parser.add_argument('--td_perc', help='percentile for identify scaffolds with compatible tetranucleotide signatures', type=int, choices=range(0, 101), default=95, metavar='int')
     compatible_parser.add_argument('--cov_corr', help='correlation for identifying scaffolds with compatible coverage profiles', type=float, default=0.8)
-    compatible_parser.add_argument('--cov_perc', help='mean absolute percent error for identifying scaffolds with compatible coverage profiles', type=int, choices=xrange(0, 1001), default=50, metavar='int')
+    compatible_parser.add_argument('--cov_perc', help='mean absolute percent error for identifying scaffolds with compatible coverage profiles', type=int, choices=range(0, 1001), default=50, metavar='int')
     compatible_parser.add_argument('-r', '--report_type', help="report sequences that are compatible in 'all' or 'any' reference distribution", choices=['any', 'all'], default='all')
     compatible_parser.add_argument('--silent', help="suppress output of logger", action='store_true')
     
@@ -307,9 +309,9 @@ if __name__ == '__main__':
     modify_bin_parser.add_argument('-a', '--add', action='append', help="ID of scaffold to add to genome (may specify multiple times)")
     modify_bin_parser.add_argument('-r', '--remove', action='append', help="ID of scaffold to remove from bin (may specify multiple times)")
     modify_bin_parser.add_argument('-o', '--outlier_file', help="remove all scaffolds identified as outliers (see outlier command)")
-    modify_bin_parser.add_argument('-c', '--compatible_file', help="add all scaffolds identified as compatible (see compatible command)")
-    modify_bin_parser.add_argument('--unique_only', action='store_true', help="only consider scaffolds specified exactly once in the compatible file (see compatible command)")
-    modify_bin_parser.add_argument('--closest_only', action='store_true', help="only consider scaffolds in compatible file which are closest to target genome in terms of GC, tetranuclotide, and coverage (see compatible command)")
+    #***modify_bin_parser.add_argument('-c', '--compatible_file', help="add all scaffolds identified as compatible (see compatible command)")
+    #***modify_bin_parser.add_argument('--unique_only', action='store_true', help="only consider scaffolds specified exactly once in the compatible file (see compatible command)")
+    #***modify_bin_parser.add_argument('--closest_only', action='store_true', help="only consider scaffolds in compatible file which are closest to target genome in terms of GC, tetranuclotide, and coverage (see compatible command)")
     modify_bin_parser.add_argument('--silent', help="suppress output of logger", action='store_true')
     
     # Remove scaffolds across bins
@@ -395,7 +397,7 @@ if __name__ == '__main__':
         else:
             parser.parse_options(args)
     except SystemExit:
-        print "\n  Controlled exit resulting from an unrecoverable error or warning."
+        print("\n  Controlled exit resulting from an unrecoverable error or warning.")
     except:
-        print "\nUnexpected error:", sys.exc_info()[0]
+        print("\nUnexpected error:", sys.exc_info()[0])
         raise

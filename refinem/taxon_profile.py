@@ -202,14 +202,14 @@ class TaxonProfile(object):
             scaffold_stats = self.read_scaffold_stats(genome_id)
             
             # identify common taxa across scaffolds
-            for rank in xrange(0, len(Taxonomy.rank_prefixes)):
+            for rank in range(0, len(Taxonomy.rank_prefixes)):
                 total_genes = 0
                 genome_gene_count = defaultdict(int)
                 for scaffold_id in profile:
                     _, _, _, num_genes, _ = scaffold_stats[scaffold_id]
                     total_genes += num_genes
                     
-                    for taxon, stats in profile[scaffold_id][rank].iteritems():
+                    for taxon, stats in profile[scaffold_id][rank].items():
                         _percent, gene_count, classified_genes = stats
                         genome_gene_count[taxon] += gene_count
                         
@@ -218,7 +218,7 @@ class TaxonProfile(object):
                     break
                     
                 common_taxa[genome_id][rank] = set()
-                for taxon, gene_count in genome_gene_count.iteritems():
+                for taxon, gene_count in genome_gene_count.items():
                     if gene_count * 100.0 / total_classified_genes >= common_threshold:
                         common_taxa[genome_id][rank].add(taxon)
             
@@ -246,7 +246,7 @@ class TaxonProfile(object):
                     genome_id = genome_id[0:genome_id.rfind('_genes')]
                 
                 profiles[genome_id] = {}
-                for r, i in enumerate(xrange(4, len(line_split), 7)):
+                for r, i in enumerate(range(4, len(line_split), 7)):
                     taxon = line_split[i]
                     gene_support = float(line_split[i+2])
                     
@@ -274,7 +274,7 @@ class TaxonProfile(object):
         classification = {}
         for genome_id in profiles:
             taxa_str = []
-            for r in xrange(0, len(Taxonomy.rank_prefixes)):
+            for r in range(0, len(Taxonomy.rank_prefixes)):
                 taxa_str.append('%s (%.2f)' % profiles[genome_id].get(r, (Taxonomy.rank_prefixes[r], 0)))
                 
             classification[genome_id] = ';'.join(taxa_str)
@@ -312,7 +312,7 @@ class TaxonProfile(object):
                         genome_id = genome_id[0:genome_id.rfind('_genes')]
                     
                     taxa = []
-                    for i in xrange(7, len(line_split), 5):
+                    for i in range(7, len(line_split), 5):
                         taxon = line_split[i]
                         gene_support = line_split[i+1]
                         
@@ -372,13 +372,13 @@ class TaxonProfile(object):
         # calculate percentages
         profile = defaultdict(lambda : defaultdict(lambda : defaultdict(float)))
         for scaffold_id in gene_taxonomy:
-            for rank in xrange(0, len(Taxonomy.rank_prefixes)):
+            for rank in range(0, len(Taxonomy.rank_prefixes)):
                 total = gene_count[scaffold_id]
                 if rank in gene_taxonomy[scaffold_id]:
                     if classified_genes:
                         total = sum(gene_taxonomy[scaffold_id][rank].values())
                     
-                    for taxon, count in gene_taxonomy[scaffold_id][rank].iteritems():
+                    for taxon, count in gene_taxonomy[scaffold_id][rank].items():
                         profile[scaffold_id][rank][taxon] = (float(count) * 100.0 / total, count, total)
                 else:
                     # no classification at this rank
@@ -480,7 +480,7 @@ class TaxonProfile(object):
                             check_duplicate_names=False, 
                             report_errors=True):
             self.logger.error('Invalid taxonomy file.')
-            sys.exit()
+            sys.exit(-1)
             
         # record length and number of genes in each scaffold
         for aa_file in gene_files:
@@ -493,20 +493,24 @@ class TaxonProfile(object):
                 self.profiles[genome_id].coding_bases[scaffold_id] += len(seq) * 3  # length in nucleotide space
 
         # run diamond and create taxonomic profile for each genome
-        self.logger.info('Running diamond blastp with %d processes (be patient!)' % self.cpus)
+        self.logger.info('Running DIAMOND blastp with {:,} processes (be patient!)'.format(self.cpus))
 
         diamond = Diamond(self.cpus)
         diamond_table_out = os.path.join(diamond_output_dir, 'diamond_hits.tsv')
-        diamond.blastp(gene_file, 
-                        db_file, 
-                        evalue, 
-                        per_identity, 
-                        per_aln_len, 
-                        1, 
-                        False,
-                        diamond_table_out, 
-                        output_fmt='standard', 
-                        tmp_dir=tmpdir)
+        if not os.path.exists(diamond_table_out):
+            diamond.blastp(gene_file, 
+                            db_file, 
+                            evalue, 
+                            per_identity, 
+                            per_aln_len, 
+                            1, 
+                            False,
+                            diamond_table_out, 
+                            output_fmt='standard', 
+                            tmp_dir=tmpdir)
+        else:
+            self.logger.warning('Using previously generated DIAMOND results: {}'.format(
+                                    diamond_table_out))
                
         # create taxonomic profile for each genome
         self.logger.info('Creating taxonomic profile for each genome.')
@@ -536,12 +540,12 @@ class TaxonProfile(object):
         # create Krona plot based on classification of scaffolds
         self.logger.info('Creating Krona plot for each genome.')
         krona_profiles = defaultdict(lambda: defaultdict(int))
-        for genome_id, profile in self.profiles.iteritems():
+        for genome_id, profile in self.profiles.items():
             seq_assignments = profile.classify_seqs()
 
-            for seq_id, classification in seq_assignments.iteritems():
+            for seq_id, classification in seq_assignments.items():
                 taxa = []
-                for r in xrange(0, len(Taxonomy.rank_labels)):
+                for r in range(0, len(Taxonomy.rank_labels)):
                     taxa.append(classification[r][0])
 
                 krona_profiles[genome_id][';'.join(taxa)] += profile.genes_in_scaffold[seq_id]
@@ -624,12 +628,12 @@ class TaxonProfile(object):
             profile = self.read_scaffold_profile(genome_id, classified_genes=True)
             scaffold_stats = self.read_scaffold_stats(genome_id)
             
-            for rank in xrange(0, len(Taxonomy.rank_prefixes)):
+            for rank in range(0, len(Taxonomy.rank_prefixes)):
                 # determine consensus taxon for genome
                 genome_consensus = defaultdict(int)
                 genome_classified_genes = 0
                 for scaffold_id in profile:
-                    for taxon, stats in profile[scaffold_id][rank].iteritems():
+                    for taxon, stats in profile[scaffold_id][rank].items():
                         _, gene_count, classified_genes = stats
                         
                         genome_consensus[taxon] += gene_count
@@ -655,7 +659,7 @@ class TaxonProfile(object):
                     if support > trusted_scaffold_threshold:
                         trusted_scaffolds.add(scaffold_id)
                         
-                        for taxon, stats in profile[scaffold_id][rank].iteritems():
+                        for taxon, stats in profile[scaffold_id][rank].items():
                             _, gene_count, classified_genes = stats
                             trusted_gene_profile[taxon] += gene_count
 
@@ -663,7 +667,7 @@ class TaxonProfile(object):
 
                 # identify common taxa across trusted scaffolds
                 common_taxa = set()
-                for taxon, gene_count in trusted_gene_profile.iteritems():
+                for taxon, gene_count in trusted_gene_profile.items():
                     if gene_count * 100.0 / trusted_classified_genes > common_taxa_threshold:
                         common_taxa.add(taxon)
      
@@ -672,7 +676,7 @@ class TaxonProfile(object):
                 for scaffold_id in profile:
                     length, gc, mean_cov, num_genes, _coding_bases = scaffold_stats[scaffold_id]
                     scaffold_consensus_support, _, _ = profile[scaffold_id][rank].get(consensus_taxon, [0, 0, 0])
-                    classified_genes = profile[scaffold_id][rank].values()[0][2]
+                    classified_genes = list(profile[scaffold_id][rank].values())[0][2]
 
                     if classified_genes < max(min_classified_threshold, num_genes * min_classified_per_threshold/100):
                         continue
@@ -680,7 +684,7 @@ class TaxonProfile(object):
                     congruent_gene_count = 0
                     scaffold_taxon = consensus_taxon
                     scaffold_taxon_support = scaffold_consensus_support
-                    for taxon, stats in profile[scaffold_id][rank].iteritems():
+                    for taxon, stats in profile[scaffold_id][rank].items():
                         support, gene_count, classified_genes = stats
                         
                         if taxon in common_taxa:                            
@@ -765,7 +769,7 @@ class TaxonProfile(object):
                         # determine classifcation of scaffold with the most support
                         scaffold_taxon_support = scaffold_support
                         scaffold_taxon = genome_taxon
-                        for taxon, stats in profile[scaffold_id][rank].iteritems():
+                        for taxon, stats in profile[scaffold_id][rank].items():
                             support, _, classified_genes = stats
                             if support > scaffold_taxon_support:
                                 scaffold_taxon = taxon
@@ -898,9 +902,9 @@ class Profile(object):
 
         # classify each scaffold using a majority vote
         seq_assignments = defaultdict(lambda: defaultdict(list))
-        for seq_id, rank_hits in self.hits.iteritems():
+        for seq_id, rank_hits in self.hits.items():
             parent_taxa = None
-            for rank in xrange(0, len(Taxonomy.rank_prefixes)):
+            for rank in range(0, len(Taxonomy.rank_prefixes)):
                 taxa = max(rank_hits[rank], key=lambda x: len(rank_hits[rank][x]))
                 count = len(rank_hits[rank][taxa])
                 
@@ -911,14 +915,14 @@ class Profile(object):
                         parent_taxa = taxa
                 else:
                     # set to unclassified at all lower ranks
-                    for r in xrange(rank, len(Taxonomy.rank_prefixes)):
+                    for r in range(rank, len(Taxonomy.rank_prefixes)):
                         seq_assignments[seq_id][r] = [self.unclassified, None]
                     break
 
         # identify scaffold with no hits
         for seq_id in self.genes_in_scaffold:
             if seq_id not in seq_assignments:
-                for rank in xrange(0, len(Taxonomy.rank_prefixes)):
+                for rank in range(0, len(Taxonomy.rank_prefixes)):
                     seq_assignments[seq_id][rank] = [self.unclassified, None]
 
         return seq_assignments
@@ -951,12 +955,12 @@ class Profile(object):
         profile = defaultdict(lambda: defaultdict(float))
         stats = defaultdict(dict)
 
-        for r in xrange(0, len(Taxonomy.rank_labels)):
+        for r in range(0, len(Taxonomy.rank_labels)):
             num_seqs = defaultdict(int)
             num_genes = defaultdict(int)
             num_basepairs = defaultdict(int)
             hit_stats = defaultdict(list)
-            for seq_id, data in seq_assignments.iteritems():
+            for seq_id, data in seq_assignments.items():
                 taxa, hit_info = data[r]
                 profile[r][taxa] += float(self.genes_in_scaffold[seq_id]) / total_genes
                 num_seqs[taxa] += 1
@@ -967,7 +971,7 @@ class Profile(object):
                     hit_stats[taxa].extend(hit_info)
 
             # calculate averages of hit statistics
-            for taxa, hit_info in hit_stats.iteritems():
+            for taxa, hit_info in hit_stats.items():
                 avg_evalue = mean([x.evalue for x in hit_info])
                 avg_perc_identity = mean([x.perc_identity for x in hit_info])
                 avg_aln_length = mean([x.aln_length for x in hit_info])
@@ -1004,11 +1008,11 @@ class Profile(object):
         total_coding_bases = sum(self.coding_bases.values())
 
         fout.write('%s\t%d\t%d\t%d' % (self.genome_id, total_seqs, total_genes, total_coding_bases))
-        for r in xrange(0, len(Taxonomy.rank_labels)):
+        for r in range(0, len(Taxonomy.rank_labels)):
             if len(profile[r]) == 0:
                 continue
                 
-            taxa, _percent = max(profile[r].iteritems(), key=operator.itemgetter(1))
+            taxa, _percent = max(profile[r].items(), key=operator.itemgetter(1))
 
             if taxa != self.unclassified:
                 fout.write('\t%s\t%.2f\t%.2f\t%.2f\t%.2g\t%.2f\t%.2f' % (taxa,
@@ -1057,7 +1061,7 @@ class Profile(object):
 
         sorted_profiles = {}
         max_taxa = 0
-        for r in xrange(0, len(Taxonomy.rank_labels)):
+        for r in range(0, len(Taxonomy.rank_labels)):
             sorted_profile = sorted(profile[r].items(), key=operator.itemgetter(1))
             sorted_profile.reverse()
 
@@ -1071,8 +1075,8 @@ class Profile(object):
         total_genes = sum(self.genes_in_scaffold.values())
         total_coding_bases = sum(self.coding_bases.values())
 
-        for i in xrange(0, max_taxa):
-            for r in xrange(0, len(Taxonomy.rank_labels)):
+        for i in range(0, max_taxa):
+            for r in range(0, len(Taxonomy.rank_labels)):
                 if r != 0:
                     fout.write('\t')
 
@@ -1132,7 +1136,7 @@ class Profile(object):
                                        self.genes_in_scaffold[seq_id],
                                        self.coding_bases[seq_id]))
 
-            for r in xrange(0, len(Taxonomy.rank_labels)):
+            for r in range(0, len(Taxonomy.rank_labels)):
                 taxa, hit_info = seq_assignments[seq_id][r]
 
                 if taxa != self.unclassified:
@@ -1168,7 +1172,7 @@ class Profile(object):
         fout = open(output_file, 'w')
         fout.write('Gene id\tCoding bases (nt)\tSubject genome id\tSubject gene id\tTaxonomy\te-value\t% identity\talign. length (aa)\t% query aligned\tQuery sequence\n')
 
-        for gene_id, data in self.gene_hits.iteritems():
+        for gene_id, data in self.gene_hits.items():
             taxonomy, hit_info = data
 
             seq = gene_seqs[gene_id]

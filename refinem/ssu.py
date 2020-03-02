@@ -283,7 +283,7 @@ class SSU(object):
 
                 hits = {}
                 if len(seq_info) > 0:
-                    for seq_id, seq_hits in seq_info.iteritems():
+                    for seq_id, seq_hits in seq_info.items():
                         for hit in seq_hits:
                             self._add_hit(hits, seq_id, hit, concatenate_threshold)
 
@@ -291,8 +291,8 @@ class SSU(object):
 
             # find best domain hit for each
             best_hits[genome_id] = {}
-            for _, hits in hits_per_domain.iteritems():
-                for seq_id, info in hits.iteritems():
+            for _, hits in hits_per_domain.items():
+                for seq_id, info in hits.items():
                     if '-#' in seq_id:
                         seq_id = seq_id[0:seq_id.rfind('-#')]
 
@@ -380,7 +380,7 @@ class SSU(object):
         
         self.logger.info('Classifying SSU rRNA genes.')
         classifications = defaultdict(dict)
-        for genome_id, seq_file in seq_files.iteritems():
+        for genome_id, seq_file in seq_files.items():
             genome_dir = os.path.join(output_dir, genome_id)
 
             # blast sequences against 16S database
@@ -459,7 +459,7 @@ class SSU(object):
             support = float(support[1:-1])
             if support > taxon_threshold:
                 if query[i] != taxon:
-                    print query[i], taxon
+                    print(query[i], taxon)
                     return False
                     
         return True
@@ -509,7 +509,7 @@ class SSU(object):
         common_taxa = taxon_profile.common_taxa(common_taxon_threshold, 25.0)
         genome_taxonomy = taxon_profile.read_genome_taxonomy()
 
-        for genome_id, scaffold_ids in ssu_hits.iteritems():
+        for genome_id, scaffold_ids in ssu_hits.items():
             # **** HACK for SRA processing
             gid = genome_id.replace('.filtered', '')
         

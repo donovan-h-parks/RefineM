@@ -18,7 +18,6 @@
 import os
 import sys
 import ast
-import itertools
 import logging
 from collections import defaultdict, namedtuple
 
@@ -147,11 +146,11 @@ class Outliers():
                 bin_ids[scaffold_id] = bin_id
 
         compatible_scaffolds = set()
-        for scaffold_id, bin_id in bin_ids.iteritems():
+        for scaffold_id, bin_id in bin_ids.items():
             if scaffold_ids.count(scaffold_id) == 1 and bin_id == cur_bin_id:
                 compatible_scaffolds.add(scaffold_id)
                 
-        self.logger.info('Identified %d compatible scaffolds.' % len(compatible_scaffolds))
+        self.logger.info('Identified {:,} compatible scaffolds.'.format(len(compatible_scaffolds)))
 
         # add compatible sequences to genome
         added_seqs = 0
@@ -162,7 +161,7 @@ class Outliers():
                     genome_seqs[seq_id] = seq
                     added_seqs += 1
                 
-        self.logger.info('Added %d scaffolds meeting length criterion.' % added_seqs)
+        self.logger.info('Added {:,} scaffolds meeting length criterion.'.format(added_seqs))
 
         # save modified bin
         seq_io.write_fasta(genome_seqs, out_genome)
@@ -223,7 +222,7 @@ class Outliers():
                     genome_seqs[seq_id] = seq
                     added_seqs += 1
                 
-        self.logger.info('Added %d scaffolds meeting length criterion.' % added_seqs)
+        self.logger.info('Added {:,} scaffolds meeting length criterion.'.format(added_seqs))
 
         # save modified bin
         seq_io.write_fasta(genome_seqs, out_genome)
@@ -281,11 +280,11 @@ class Outliers():
         # determine scaffolds that are closest to a single bin
         # in terms of GC, tetranucleotide distance, and coverage
         compatible_scaffolds = set()
-        for scaffold_id, bin_stats in scaffold_ids.iteritems():
+        for scaffold_id, bin_stats in scaffold_ids.items():
             best_gc = [1e9, None]
             best_td = [1e9, None]
             best_cov = [1e9, None]
-            for bin_id, stats in bin_stats.iteritems():
+            for bin_id, stats in bin_stats.items():
                 gc, td, cov = stats
                 if gc < best_gc[0]:
                     best_gc = [gc, bin_id]
@@ -298,7 +297,7 @@ class Outliers():
             if (best_gc[1] == best_td[1] == best_cov[1]) and best_gc[1] == cur_bin_id:
                 compatible_scaffolds.add(scaffold_id)
                 
-        self.logger.info('Identified %d compatible scaffolds.' % len(compatible_scaffolds))
+        self.logger.info('Identified {:,} compatible scaffolds.'.format(len(compatible_scaffolds)))
 
         # add compatible sequences to genome
         added_seqs = 0
@@ -309,7 +308,7 @@ class Outliers():
                     genome_seqs[seq_id] = seq
                     added_seqs += 1
                 
-        self.logger.info('Added %d scaffolds meeting length criterion.' % added_seqs)
+        self.logger.info('Added {:,} scaffolds meeting length criterion.'.format(added_seqs))
 
         # save modified bin
         seq_io.write_fasta(genome_seqs, out_genome)
@@ -333,13 +332,13 @@ class Outliers():
         # gc -> [mean GC][scaffold length][percentile]
         # td -> [scaffold length][percentile]
         gs = genome_stats[genome_id]
-        closest_gc = find_nearest(self.gc_dist.keys(), gs.median_gc / 100.0)
-        sample_seq_len = self.gc_dist[closest_gc].keys()[0]
+        closest_gc = find_nearest(list(self.gc_dist.keys()), gs.median_gc / 100.0)
+        sample_seq_len = list(self.gc_dist[closest_gc].keys())[0]
         d = self.gc_dist[closest_gc][sample_seq_len]
-        gc_lower_bound_key = find_nearest(d.keys(), (100 - gc_per) / 2.0)
-        gc_upper_bound_key = find_nearest(d.keys(), (100 + gc_per) / 2.0)
+        gc_lower_bound_key = find_nearest(list(d.keys()), (100 - gc_per) / 2.0)
+        gc_upper_bound_key = find_nearest(list(d.keys()), (100 + gc_per) / 2.0)
 
-        td_bound_key = find_nearest(self.td_dist[self.td_dist.keys()[0]].keys(), td_per)
+        td_bound_key = find_nearest(list(self.td_dist[list(self.td_dist.keys())[0]].keys()), td_per)
         
         outlying_stats = {}
         outlying_dists = defaultdict(list)
@@ -350,11 +349,11 @@ class Outliers():
             stats = scaffold_stats.stats[base_scaffold_id]
 
             # find GC and TD bounds
-            closest_seq_len = find_nearest(self.gc_dist[closest_gc].keys(), stats.length)
+            closest_seq_len = find_nearest(list(self.gc_dist[closest_gc].keys()), stats.length)
             gc_lower_bound = self.gc_dist[closest_gc][closest_seq_len][gc_lower_bound_key]
             gc_upper_bound = self.gc_dist[closest_gc][closest_seq_len][gc_upper_bound_key]
 
-            closest_seq_len = find_nearest(self.td_dist.keys(), stats.length)
+            closest_seq_len = find_nearest(list(self.td_dist.keys()), stats.length)
             td_bound = self.td_dist[closest_seq_len][td_bound_key]
 
             # find changes from median
@@ -399,7 +398,7 @@ class Outliers():
                                 self.logger.warning('Contig %s has zero coverage across all samples.' % scaffold_id)
 
                     mean_cp_err = []
-                    for cov_genome, cov_scaffold in itertools.izip(gs.median_coverage, stats.coverage):
+                    for cov_genome, cov_scaffold in zip(gs.median_coverage, stats.coverage):
                         mean_cp_err.append(abs(cov_scaffold - cov_genome) * 100.0 / max(cov_genome, self.min_required_coverage))
                             
                     mean_cp_err = np_mean(mean_cp_err)                        
@@ -472,13 +471,14 @@ class Outliers():
         fout.write('\tScaffold coverage\tMedian genome coverage\tCoverage correlation\tCoverage error\n')
 
         processed_genomes = 0
-        for genome_id, scaffold_ids in scaffold_stats.scaffolds_in_genome.iteritems():
+        for genome_id, scaffold_ids in scaffold_stats.scaffolds_in_genome.items():
             processed_genomes += 1
 
             if not self.logger.is_silent:
-                sys.stdout.write('  Finding outliers in %d of %d (%.1f%%) genomes.\r' % (processed_genomes,
-                                                                                         scaffold_stats.num_genomes(),
-                                                                                         processed_genomes * 100.0 / scaffold_stats.num_genomes()))
+                sys.stdout.write('  Finding outliers in {:,} of {:,} ({:.1f}%) genomes.\r'.format(
+                                    processed_genomes,
+                                    scaffold_stats.num_genomes(),
+                                    processed_genomes * 100.0 / scaffold_stats.num_genomes()))
                 sys.stdout.flush()
                 
             outlying_stats, outlying_dists = self.outlier_info(genome_id, 
@@ -557,35 +557,36 @@ class Outliers():
 
         self.logger.info('Identifying scaffolds compatible with bins.')
         processed_scaffolds = 0
-        for scaffold_id, ss in scaffold_stats.stats.iteritems():
+        for scaffold_id, ss in scaffold_stats.stats.items():
             processed_scaffolds += 1
             if not self.logger.is_silent:
-                sys.stdout.write('  Processed %d of %d (%.1f%%) scaffolds.\r' % (processed_scaffolds,
-                                                                             len(scaffold_stats.stats),
-                                                                             processed_scaffolds * 100.0 / len(scaffold_stats.stats)))
+                sys.stdout.write('  Processed {:,} of {:,} ({:.1f}%) scaffolds.\r'.format(
+                                    processed_scaffolds,
+                                    len(scaffold_stats.stats),
+                                    processed_scaffolds * 100.0 / len(scaffold_stats.stats)))
                 sys.stdout.flush()
 
             if scaffold_id not in scaffolds_of_interest:
                 continue
 
-            for genome_id, gs in genome_stats.iteritems():
+            for genome_id, gs in genome_stats.items():
                 # find keys into GC and TD distributions
                 # gc -> [mean GC][scaffold length][percentile]
                 # td -> [scaffold length][percentile]
-                closest_gc = find_nearest(self.gc_dist.keys(), gs.median_gc / 100.0)
-                sample_seq_len = self.gc_dist[closest_gc].keys()[0]
+                closest_gc = find_nearest(list(self.gc_dist.keys()), gs.median_gc / 100.0)
+                sample_seq_len = list(self.gc_dist[closest_gc].keys())[0]
                 d = self.gc_dist[closest_gc][sample_seq_len]
-                gc_lower_bound_key = find_nearest(d.keys(), (100 - gc_per) / 2.0)
-                gc_upper_bound_key = find_nearest(d.keys(), (100 + gc_per) / 2.0)
+                gc_lower_bound_key = find_nearest(list(d.keys()), (100 - gc_per) / 2.0)
+                gc_upper_bound_key = find_nearest(list(d.keys()), (100 + gc_per) / 2.0)
 
-                td_bound_key = find_nearest(self.td_dist[self.td_dist.keys()[0]].keys(), td_per)
+                td_bound_key = find_nearest(list(self.td_dist[list(self.td_dist.keys())[0]].keys()), td_per)
 
                 # find GC and TD bounds
-                closest_seq_len = find_nearest(self.gc_dist[closest_gc].keys(), ss.length)
+                closest_seq_len = find_nearest(list(self.gc_dist[closest_gc].keys()), ss.length)
                 gc_lower_bound = self.gc_dist[closest_gc][closest_seq_len][gc_lower_bound_key]
                 gc_upper_bound = self.gc_dist[closest_gc][closest_seq_len][gc_upper_bound_key]
 
-                closest_seq_len = find_nearest(self.td_dist.keys(), ss.length)
+                closest_seq_len = find_nearest(list(self.td_dist.keys()), ss.length)
                 td_bound = self.td_dist[closest_seq_len][td_bound_key]
 
                 # find changes from mean
@@ -607,7 +608,7 @@ class Outliers():
                         compatible_dists.append('COV_CORR')
 
                 mean_cp = []
-                for cov_genome, cov_scaffold in itertools.izip(gs.median_coverage, ss.coverage):
+                for cov_genome, cov_scaffold in zip(gs.median_coverage, ss.coverage):
                     if cov_genome >= self.min_required_coverage:
                         mean_cp.append(abs(cov_genome - cov_scaffold) * 100.0 / cov_genome)
 
@@ -683,14 +684,14 @@ class Outliers():
         # create plots        
         genomes_processed = 0
         genome_plots = defaultdict(list)
-        for genome_id, gs in genome_stats.iteritems():
+        for genome_id, gs in genome_stats.items():
             genomes_processed += 1
 
             if not self.logger.is_silent:
-                sys.stdout.write('  Plotting scaffold distribution for %d of %d (%.1f%%) genomes.\r' %
-                                                                                                (genomes_processed,
-                                                                                                 len(genome_stats),
-                                                                                                 genomes_processed * 100.0 / len(genome_stats)))
+                sys.stdout.write('  Plotting scaffold distribution for {:,} of {:,} ({:.1f}%) genomes.\r'.format(
+                                        genomes_processed,
+                                        len(genome_stats),
+                                        genomes_processed * 100.0 / len(genome_stats)))
                 sys.stdout.flush()
 
             genome_scaffold_stats = {}
@@ -698,7 +699,7 @@ class Outliers():
                 genome_scaffold_stats[scaffold_id] = scaffold_stats.stats[scaffold_id]
                 
             if len(genome_scaffold_stats) <= 1:
-                self.logger.info('Skipping plots for %s as it contains only %d contigs.' % (genome_id, len(genome_scaffold_stats)))
+                self.logger.info('Skipping plots for {} as it contains only {:,} contigs.'.format(genome_id, len(genome_scaffold_stats)))
                 continue
                 
             if individual_plots:
