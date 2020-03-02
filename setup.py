@@ -38,6 +38,6 @@ if __name__ == '__main__':
             "biolib>=0.0.45",
             "jinja2>=2.7.3",
             "mpld3>=0.2",
-	    "pysam",
+            "pysam",
             "weightedstats"],
     )
