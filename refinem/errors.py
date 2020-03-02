@@ -20,5 +20,5 @@ class ParsingError(Exception):
     def __init__(self, message):
         super(ParsingError, self).__init__(message)
 
-        print ''
-        print message
+        print('')
+        print(message)

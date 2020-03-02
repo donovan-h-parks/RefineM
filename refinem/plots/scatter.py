@@ -45,7 +45,7 @@ class Scatter(BasePlot):
         """
         
         pts = {}
-        for scaffold_id, stats in genome_scaffold_stats.iteritems():
+        for scaffold_id, stats in genome_scaffold_stats.items():
             pts[scaffold_id] = (stats.gc, mean(stats.coverage))
             
         return pts

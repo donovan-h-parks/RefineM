@@ -77,7 +77,7 @@ class Tetranucleotide(object):
         sig = self.signatures.seq_signature(seq)
 
         total_kmers = sum(sig)
-        for i in xrange(0, len(sig)):
+        for i in range(0, len(sig)):
             sig[i] = float(sig[i]) / max(total_kmers, 1)
 
         return (seq_id, sig)
@@ -126,7 +126,10 @@ class Tetranucleotide(object):
         if self.logger.is_silent:
             return None
         else:
-            return '  Finished processing %d of %d (%.2f%%) sequences.' % (processed_items, total_items, float(processed_items) * 100 / total_items)
+            return '  Finished processing {:,} of {:,} ({:.2f}%) sequences.'.format(
+                        processed_items, 
+                        total_items, 
+                        float(processed_items) * 100 / total_items)
 
     def run(self, seq_file):
         """Calculate tetranucleotide signatures of sequences.
@@ -169,7 +172,7 @@ class Tetranucleotide(object):
                 header = f.readline().split('\t')
                 kmer_order = [x.strip().upper() for x in header[1:]]
                 if len(kmer_order) != len(self.canonical_order()):
-                    raise ParsingError("[Error] Tetranucleotide file must contain exactly %d tetranucleotide columns." % len(self.canonical_order()))
+                    raise ParsingError("[Error] Tetranucleotide file must contain exactly {:,} tetranucleotide columns.".format(len(self.canonical_order())))
 
                 canonical_order_index = np.argsort(kmer_order)
                 canonical_order = [kmer_order[i] for i in canonical_order_index]
@@ -183,10 +186,10 @@ class Tetranucleotide(object):
 
             return sig
         except IOError:
-            print '[Error] Failed to open signature file: %s' % signature_file
-            sys.exit()
+            print('[Error] Failed to open signature file: %s' % signature_file)
+            sys.exit(-1)
         except ParsingError:
-            sys.exit()
+            sys.exit(-1)
 
     def write(self, signatures, output_file):
         """Write tetranucleotide signatures.
@@ -206,7 +209,7 @@ class Tetranucleotide(object):
             fout.write('\t' + kmer)
         fout.write('\n')
 
-        for seq_id, tetra_signature in signatures.iteritems():
+        for seq_id, tetra_signature in signatures.items():
             fout.write(seq_id + '\t')
             fout.write('\t'.join(map(str, tetra_signature)))
             fout.write('\n')

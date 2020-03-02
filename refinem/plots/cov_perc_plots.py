@@ -15,8 +15,6 @@
 #                                                                             #
 ###############################################################################
 
-import itertools
-
 import mpld3
 
 import numpy as np
@@ -38,7 +36,7 @@ class CovPercPlots(BasePlot):
         mean_perc_diffs = []
         for stats in genome_scaffold_stats.values():
             mean_perc_diff = []
-            for cov_genome, cov_scaffold in itertools.izip(mean_coverage, stats.coverage):
+            for cov_genome, cov_scaffold in zip(mean_coverage, stats.coverage):
                 if cov_genome == 0:
                     mean_perc_diff.append(0)
                 elif len(mean_coverage) >= 2:
@@ -66,7 +64,7 @@ class CovPercPlots(BasePlot):
         mean_perc_diffs = self._mean_perc_diffs(genome_scaffold_stats, mean_coverage)
         
         pts = {}
-        for i, (scaffold_id, stats) in enumerate(genome_scaffold_stats.iteritems()):
+        for i, (scaffold_id, stats) in enumerate(genome_scaffold_stats.items()):
             pts[scaffold_id] = (mean_perc_diffs[i], stats.length / 1000.0)
             
         return pts

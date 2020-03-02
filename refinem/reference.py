@@ -110,23 +110,23 @@ class Reference(object):
         scaffold_stats.read(stat_file)
 
         # perform homology searches
-        self.logger.info('Creating diamond database for reference genomes.')
+        self.logger.info('Creating DIAMOND database for reference genomes.')
         ref_gene_file = os.path.join(self.output_dir, 'ref_genes.faa')
         concatenate_gene_files(ref_genome_gene_files, ref_gene_file)
 
         diamond = Diamond(self.cpus)
         ref_diamond_db = os.path.join(self.output_dir, 'ref_genes')
-        diamond.make_database(ref_gene_file, ref_diamond_db)
+        diamond.create_db(ref_gene_file, ref_diamond_db)
 
         self.logger.info('Identifying homologs within reference genomes of interest (be patient!).')
         self.diamond_dir = os.path.join(self.output_dir, 'diamond')
         make_sure_path_exists(self.diamond_dir)
         hits_ref_genomes = os.path.join(self.diamond_dir, 'ref_hits.tsv')
-        diamond.blastp(scaffold_gene_file, ref_diamond_db, evalue, per_identity, per_aln_len, 1, hits_ref_genomes)
+        diamond.blastp(scaffold_gene_file, ref_diamond_db, evalue, per_identity, per_aln_len, 1, False, hits_ref_genomes)
 
         self.logger.info('Identifying homologs within competing reference genomes (be patient!).')
         hits_comp_ref_genomes = os.path.join(self.diamond_dir, 'competing_ref_hits.tsv')
-        diamond.blastp(scaffold_gene_file, db_file, evalue, per_identity, per_aln_len, 1, hits_comp_ref_genomes)
+        diamond.blastp(scaffold_gene_file, db_file, evalue, per_identity, per_aln_len, 1, False, hits_comp_ref_genomes)
 
         # get list of genes with a top hit to the reference genomes of interest
         hits_to_ref = self._top_hits_to_reference(hits_ref_genomes, hits_comp_ref_genomes)
@@ -139,7 +139,7 @@ class Reference(object):
 
         # get hits to each scaffold
         hits_to_scaffold = defaultdict(list)
-        for query_id, hit in hits_to_ref.iteritems():
+        for query_id, hit in hits_to_ref.items():
             gene_id = query_id[0:query_id.rfind('~')]
             scaffold_id = gene_id[0:gene_id.rfind('_')]
             hits_to_scaffold[scaffold_id].append(hit)
@@ -151,7 +151,7 @@ class Reference(object):
         fout.write('\tGenome ID\tLength (bp)\tGC\tMean coverage')
         fout.write('\t# genes\t# hits\t% genes\tAvg. align. length (bp)\tAvg. % identity\tAvg. e-value\tAvg. bitscore\n')
 
-        for scaffold_id, hits in hits_to_scaffold.iteritems():
+        for scaffold_id, hits in hits_to_scaffold.items():
             aln_len = []
             perc_iden = []
             evalue = []

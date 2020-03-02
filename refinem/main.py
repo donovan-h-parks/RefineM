@@ -280,7 +280,7 @@ class OptionsParser():
         self.logger.info('Outlier information written to: ' + outlier_file)
 
         # create outlier plots
-        if not options.no_plots:
+        if options.create_plots:
             plot_dir = os.path.join(options.output_dir, 'plots')
             make_sure_path_exists(plot_dir)
         
@@ -498,6 +498,7 @@ class OptionsParser():
 
         make_sure_path_exists(os.path.dirname(options.output_genome))
 
+        options.compatible_file = None #*** Removed with Python 3 port       
         if not (options.add or options.remove or options.outlier_file or options.compatible_file):
             self.logger.warning('No modification to bin requested.\n')
             sys.exit()
@@ -548,12 +549,12 @@ class OptionsParser():
         if failed_to_add:
             self.logger.warning('Failed to add the following sequence(s):')
             for seq_id in failed_to_add:
-                print '    %s' % seq_id
+                print('    %s' % seq_id)
 
         if failed_to_remove:
             self.logger.warning('Failed to remove the following sequence(s):')
             for seq_id in failed_to_remove:
-                print '    %s' % seq_id
+                print('    %s' % seq_id)
 
         self.logger.info('Modified genome written to: ' + options.output_genome)
         
@@ -629,7 +630,7 @@ class OptionsParser():
                         self.logger.info('There are %d sequences shared between %s and %s:' % (len(dup_seq_ids), genome_idA, genome_idB))
 
                     for seq_id in dup_seq_ids:
-                        print '    %s' % seq_id
+                        print('    %s' % seq_id)
 
     def bin_compare(self, options):
         """Bin compare command"""

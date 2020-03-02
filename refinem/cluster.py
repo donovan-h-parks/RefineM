@@ -118,7 +118,7 @@ class Cluster():
         genome_stats = []
         signature_matrix = []
         seqs = seq_io.read(genome_file)
-        for seq_id, seq in seqs.iteritems():
+        for seq_id, seq in seqs.items():
             stats = scaffold_stats.stats[seq_id]
 
             if not no_coverage:
@@ -133,7 +133,7 @@ class Cluster():
             else:
                 sig = signatures.seq_signature(seq)
                 total_kmers = sum(sig)
-                for i in xrange(0, len(sig)):
+                for i in range(0, len(sig)):
                     sig[i] = float(sig[i]) / total_kmers
                 signature_matrix.append(sig)
 
@@ -142,7 +142,7 @@ class Cluster():
             if not no_pca:
                 self.logger.info('Calculating PCA of genomic signatures.')
                 pc, variance = self.pca(signature_matrix)
-                self.logger.info('First %d PCs capture %.1f%% of the variance.' % (num_components, sum(variance[0:num_components]) * 100))
+                self.logger.info('First {:,} PCs capture {:.1f}% of the variance.'.format(num_components, sum(variance[0:num_components]) * 100))
     
                 for i, stats in enumerate(genome_stats):
                     genome_stats[i] = np_append(stats, pc[i][0:num_components])
@@ -159,7 +159,7 @@ class Cluster():
             genome_stats = np_array(genome_stats)
 
         # cluster
-        self.logger.info('Partitioning genome into %d clusters.' % num_clusters)
+        self.logger.info('Partitioning genome into {:,} clusters.'.format(num_clusters))
 
         bError = True
         while bError:
@@ -170,7 +170,7 @@ class Cluster():
                 bError = True
 
         for k in range(num_clusters):
-            self.logger.info('Placed %d sequences in cluster %d.' % (sum(labels == k), (k + 1)))
+            self.logger.info('Placed {:,} sequences in cluster {:,}.'.format(sum(labels == k), (k + 1)))
 
         # write out clusters
         genome_id = remove_extension(genome_file)
@@ -234,7 +234,7 @@ class Cluster():
             signatures = GenomicSignature(K)
             signature_matrix = []
             seqs = seq_io.read(genome_file)
-            for seq_id, seq in seqs.iteritems():
+            for seq_id, seq in seqs.items():
                 stats = scaffold_stats.stats[seq_id]
 
                 signature_matrix.append(stats.signature)
@@ -250,7 +250,7 @@ class Cluster():
         fout1 = open(os.path.join(output_dir, genome_id + '_c1.fna'), 'w')
         fout2 = open(os.path.join(output_dir, genome_id + '_c2.fna'), 'w')
 
-        for seq_id, seq in seqs.iteritems():
+        for seq_id, seq in seqs.items():
             stats = scaffold_stats.stats[seq_id]
             
             meet_criteria = True

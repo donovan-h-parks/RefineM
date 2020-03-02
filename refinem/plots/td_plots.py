@@ -49,7 +49,7 @@ class TdPlots(BasePlot):
         genomic_signature = GenomicSignature(0)
 
         pts = {}
-        for scaffold_id, stats in genome_scaffold_stats.iteritems():
+        for scaffold_id, stats in genome_scaffold_stats.items():
             pts[scaffold_id] = (genomic_signature.manhattan(stats.signature, mean_signature), 
                                 stats.length / 1000.0)
             
@@ -154,7 +154,8 @@ class TdPlots(BasePlot):
         # plot reference distributions
         for percentile in percentiles_to_plot:
             # find closest distribution values
-            td_bound_key = find_nearest(td_dist[td_dist.keys()[0]].keys(), percentile)
+            first_key = list(td_dist.keys())[0]
+            td_bound_key = find_nearest(list(td_dist[first_key].keys()), percentile)
 
             x = []
             y = []
@@ -169,8 +170,8 @@ class TdPlots(BasePlot):
 
             # make sure x-values are strictly decreasing as y increases
             # as this is conservative and visually satisfying
-            for i in xrange(0, len(x) - 1):
-                for j in xrange(i + 1, len(x)):
+            for i in range(0, len(x) - 1):
+                for j in range(i + 1, len(x)):
                     if x[j] > x[i]:
                         if j == len(x) - 1:
                             x[j] = x[i]

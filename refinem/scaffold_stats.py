@@ -113,7 +113,8 @@ class ScaffoldStats(object):
         fout.write('Scaffold id\tGenome Id\tGC\tLength (bp)')
 
         if cov_profiles:
-            bam_ids = sorted(cov_profiles[cov_profiles.keys()[0]].keys())
+            first_key = list(cov_profiles.keys())[0]
+            bam_ids = sorted(cov_profiles[first_key].keys())
             for bam_id in bam_ids:
                 fout.write('\t' + bam_id)
 
@@ -182,10 +183,10 @@ class ScaffoldStats(object):
 
             return sig
         except IOError:
-            print '[Error] Failed to open scaffold statistics file: %s' % stats_file
-            sys.exit()
+            print('[Error] Failed to open scaffold statistics file: %s' % stats_file)
+            sys.exit(-1)
         except ParsingError:
-            sys.exit()
+            sys.exit(-1)
 
     def num_scaffolds(self):
         """Number of scaffolds.

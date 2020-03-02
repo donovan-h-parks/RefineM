@@ -15,8 +15,6 @@
 #                                                                             #
 ###############################################################################
 
-import itertools
-
 import mpld3
 
 from scipy.stats import pearsonr
@@ -66,7 +64,7 @@ class CovCorrPlots(BasePlot):
         correlations = self._correlation(genome_scaffold_stats, mean_coverage)
         
         pts = {}
-        for i, (scaffold_id, stats) in enumerate(genome_scaffold_stats.iteritems()):
+        for i, (scaffold_id, stats) in enumerate(genome_scaffold_stats.items()):
             scaffold_stats[scaffold_id] = (correlations[i], stats.length / 1000.0)
             
         return pts

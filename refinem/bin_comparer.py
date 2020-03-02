@@ -78,7 +78,7 @@ class BinComparer(object):
         genome_stats = {}
         processed_seqs = set()
         repeats = set()
-        for binId, seqs in genomes.iteritems():
+        for binId, seqs in genomes.items():
             num_binned_bases = 0
             for seq_id in seqs:
                 num_binned_bases += seq_lens[seq_id]
@@ -135,32 +135,32 @@ class BinComparer(object):
         genome_stats2, total_uniq_binned_seqs2, total_uniq_binned_bases2, num_repeats2 = self._genome_stats(genome_seqs2, seq_lens)
 
         # sort bins by size
-        genome_stats1 = sorted(genome_stats1.iteritems(), key=lambda x: x[1][1], reverse=True)
-        genome_stats2 = sorted(genome_stats2.iteritems(), key=lambda x: x[1][1], reverse=True)
+        genome_stats1 = sorted(genome_stats1.items(), key=lambda x: x[1][1], reverse=True)
+        genome_stats2 = sorted(genome_stats2.items(), key=lambda x: x[1][1], reverse=True)
 
         # report summary results
-        self.reporter.info('Total seqs = %d (%.2f Mbp)' % (len(seq_lens), float(total_bases) / 1e6))
+        self.reporter.info('Total seqs = {:,} ({:.2f} Mbp)'.format(len(seq_lens), float(total_bases) / 1e6))
         for length in lengths_to_check:
-            self.reporter.info('  # seqs > %d kbp = %d (%.2f Mbp)' % (int(length / 1000),
+            self.reporter.info('  # seqs > {:,} kbp = {:,} ({:.2f} Mbp)'.format(int(length / 1000),
                                                                         num_seqs_over_length[length],
                                                                         float(total_bases_over_length[length]) / 1e6))
 
         self.reporter.info('')
         self.reporter.info('Binned seqs statistics:')
-        self.reporter.info('  1) # genomes: %s, # binned seqs: %d (%.2f%%), # binned bases: %.2f Mbp (%.2f%%), # seqs in multiple bins: %d'
-                                % (len(genome_seqs1),
-                                   total_uniq_binned_seqs2,
-                                   float(total_uniq_binned_seqs1) * 100 / len(seq_lens),
-                                   float(total_uniq_binned_bases1) / 1e6,
-                                   float(total_uniq_binned_bases1) * 100 / total_bases,
-                                   num_repeats1))
-        self.reporter.info('  2) # genomes: %s, # binned seqs: %d (%.2f%%), # binned bases: %.2f Mbp (%.2f%%), # seqs in multiple bins: %d'
-                                % (len(genome_seqs2),
-                                   total_uniq_binned_seqs2,
-                                   float(total_uniq_binned_seqs2) * 100 / len(seq_lens),
-                                   float(total_uniq_binned_bases2) / 1e6,
-                                   float(total_uniq_binned_bases2) * 100 / total_bases,
-                                   num_repeats2))
+        self.reporter.info('  1) # genomes: {}, # binned seqs: {:,} ({:.2f}%), # binned bases: {:.2f} Mbp ({:.2f}%), # seqs in multiple bins: {:,}'.format(
+                            len(genome_seqs1),
+                            total_uniq_binned_seqs2,
+                            float(total_uniq_binned_seqs1) * 100 / len(seq_lens),
+                            float(total_uniq_binned_bases1) / 1e6,
+                            float(total_uniq_binned_bases1) * 100 / total_bases,
+                            num_repeats1))
+        self.reporter.info('  2) # genomes: {}, # binned seqs: {:,} ({:.2f}%), # binned bases: {:.2f} Mbp ({:.2f}%), # seqs in multiple bins: {:,}'.format(
+                            len(genome_seqs2),
+                            total_uniq_binned_seqs2,
+                            float(total_uniq_binned_seqs2) * 100 / len(seq_lens),
+                            float(total_uniq_binned_bases2) / 1e6,
+                            float(total_uniq_binned_bases2) * 100 / total_bases,
+                            num_repeats2))
 
         # output report
         fout = open(output_file, 'w')

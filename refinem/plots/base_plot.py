@@ -65,14 +65,14 @@ class BasePlot(AbstractPlot):
         y = []
         colours = []
         labels = []
-        for scaffold_id, stats in scaffold_stats.iteritems():
+        for scaffold_id, stats in scaffold_stats.items():
             if scaffold_id not in scaffolds_special_case:
                 x.append(stats[0])
                 y.append(stats[1])
                 colours.append((0.7, 0.7, 0.7))
                 labels.append('<small>{title}</small>'.format(title=scaffold_id))
 
-        for scaffold_id, stats in scaffold_stats.iteritems():
+        for scaffold_id, stats in scaffold_stats.items():
             if scaffold_id in highlight_scaffold_ids:
                 x.append(stats[0])
                 y.append(stats[1])
@@ -131,7 +131,7 @@ class BasePlot(AbstractPlot):
         gc_min, gc_max = 20, 80
         gc_step = 2
 
-        axis.hist(values, bins=xrange(gc_min, gc_max, gc_step), color=(0.5, 0.5, 0.5))
+        axis.hist(values, bins=range(gc_min, gc_max, gc_step), color=(0.5, 0.5, 0.5))
         axis.set_xlabel('% GC')
         axis.set_ylabel('# scaffolds (out of %d)' % len(values))
         axis.set_xlim([gc_min, gc_max])

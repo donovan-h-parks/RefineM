@@ -69,8 +69,9 @@ class GenomeStats():
             Statistics for individual scaffolds.
         """
 
-        self.logger.info("Calculating statistics for %d genomes over %d scaffolds." % (scaffold_stats.num_genomes(),
-                                                                                        scaffold_stats.num_scaffolds()))
+        self.logger.info("Calculating statistics for {:,} genomes over {:,} scaffolds.".format(
+                            scaffold_stats.num_genomes(),
+                            scaffold_stats.num_scaffolds()))
 
         self.coverage_headers = scaffold_stats.coverage_headers
         self.signature_headers = scaffold_stats.signature_headers
@@ -80,7 +81,7 @@ class GenomeStats():
         gc = defaultdict(list)
         coverage = defaultdict(list)
         signature = defaultdict(list)
-        for _scaffold_id, stats in scaffold_stats.stats.iteritems():
+        for _scaffold_id, stats in scaffold_stats.stats.items():
             if stats.genome_id == scaffold_stats.unbinned:
                 continue
                 
@@ -109,7 +110,7 @@ class GenomeStats():
             cov_array = np_array(coverage[genome_id]).T
             mean_cov = ws.numpy_weighted_mean(cov_array, weights)
             median_cov = []
-            for i in xrange(cov_array.shape[0]):
+            for i in range(cov_array.shape[0]):
                 median_cov.append(ws.numpy_weighted_median(cov_array[i,:], weights))
             
             signature_array = np_array(signature[genome_id]).T
