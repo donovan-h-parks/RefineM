@@ -15,6 +15,7 @@ RefineM is a set of tools for improving population genomes. It provides methods 
 
 ## Announcements
 
+* July 29, 2020: RefineM data files for GTDB R95 are now available 
 * Ported to Python 3 starting with version 0.1.0
 
 ## Install
