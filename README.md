@@ -18,6 +18,10 @@ RefineM is a set of tools for improving population genomes. It provides methods 
 * July 29, 2020: RefineM data files for GTDB R95 are now available 
 * Ported to Python 3 starting with version 0.1.0
 
+## Known issues
+
+* ssu_erroneous does not properly handle FASTA files with additional periods as discussed [here](https://github.com/dparks1134/RefineM/issues/47#issuecomment-643808533)
+
 ## Install
 
 The simplest way to install this package is through pip:
