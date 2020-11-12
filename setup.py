@@ -37,7 +37,7 @@ if __name__ == '__main__':
             "scipy",
             "dendropy",
             "matplotlib>=1.4.0",
-            "biolib>=0.1.0",
+            "biolib>=0.1.6",
             "jinja2>=2.7.3",
             "mpld3>=0.3",
             "pysam",
