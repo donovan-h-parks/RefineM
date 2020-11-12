@@ -34,6 +34,8 @@ if __name__ == '__main__':
         #long_description=long_description,
         install_requires=[
             "numpy>=1.9.0",
+            "scipy",
+            "dendropy",
             "matplotlib>=1.4.0",
             "biolib>=0.1.0",
             "jinja2>=2.7.3",
