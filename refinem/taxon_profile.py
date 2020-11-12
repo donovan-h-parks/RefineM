@@ -478,6 +478,7 @@ class TaxonProfile(object):
                             check_species=False,
                             check_group_names=False,
                             check_duplicate_names=False, 
+                            check_capitalization=False,
                             report_errors=True):
             self.logger.error('Invalid taxonomy file.')
             sys.exit(-1)
